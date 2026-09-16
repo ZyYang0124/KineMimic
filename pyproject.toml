@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "murmur-ethology"
+version = "0.1.0"
+description = "Computational ethology platform for ant-mimicking jumping spiders (Siler) and sympatric ants"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = ["numpy", "scipy", "opencv-python"]
+
+[project.scripts]
+murmur = "murmur.cli:main"
+
+[tool.setuptools]
+packages = ["murmur"]

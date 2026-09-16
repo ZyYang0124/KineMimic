@@ -1,0 +1,6 @@
+murmur_runs/
+_t*.avi
+_t*.js
+_mask.png
+__pycache__/
+*.pyc
