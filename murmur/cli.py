@@ -11,6 +11,7 @@ import argparse
 import time
 from pathlib import Path
 
+from .atlas import build_atlas
 from .pipeline import ingest_video, analyze
 from .store import EpisodeStore
 from .synth import generate_paths, render_video
@@ -45,9 +46,9 @@ def cmd_demo(args):
         print(f"  {vid}: {len(eps)} episodes ({time.time()-t0:.0f}s)")
         all_eps += eps
     run_dir = analyze(store, all_eps, n_motifs=args.n_motifs)
-    viz = export_murmuration(all_eps, run_dir / "viz" / "index.html")
+    atlas = build_atlas(all_eps, run_dir / "atlas")
     _print_summary(run_dir)
-    print(f"  visualization: {viz}")
+    print(f"  atlas:          {atlas}  <- open in browser")
 
 
 def cmd_ingest(args):
@@ -56,9 +57,16 @@ def cmd_ingest(args):
     for vid, vid_id in zip(args.video, args.id):
         all_eps += ingest_video(vid, store, vid_id, min_duration_s=args.min_episode_s)
     run_dir = analyze(store, all_eps, n_motifs=args.n_motifs)
-    viz = export_murmuration(all_eps, run_dir / "viz" / "index.html")
+    atlas = build_atlas(all_eps, run_dir / "atlas")
     _print_summary(run_dir)
-    print(f"  visualization: {viz}")
+    print(f"  atlas:          {atlas}  <- open in browser")
+
+
+def cmd_atlas(args):
+    from .store import EpisodeStore as ES
+    eps = ES.read_episodes(args.episodes)
+    out = build_atlas(eps, args.out)
+    print(f"atlas: {out} ({len(eps)} episodes)")
 
 
 def cmd_viz(args):
@@ -86,6 +94,11 @@ def main(argv=None):
     g.add_argument("--min-episode-s", type=float, default=3.0)
     g.add_argument("--n-motifs", type=int, default=8)
     g.set_defaults(fn=cmd_ingest)
+
+    a = sub.add_parser("atlas", help="build explorable atlas from episodes.jsonl")
+    a.add_argument("episodes")
+    a.add_argument("--out", default="atlas")
+    a.set_defaults(fn=cmd_atlas)
 
     v = sub.add_parser("viz", help="export murmuration HTML from episodes.jsonl")
     v.add_argument("episodes")

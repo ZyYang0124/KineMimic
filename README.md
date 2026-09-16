@@ -1,4 +1,8 @@
-# Murmur
+# Murmur — The Atlas of Animal Movement
+
+最终产品不是行为分析软件，而是一张**可以探索的动物运动图谱**；
+行为分析算法负责让这张图谱科学可信。第一生物系统是拟蚁跳蛛
+*Siler* 与同域蚂蚁，但图谱本身与物种无关，可扩展到任何动物运动。
 
 **Computational ethology for ant-mimicking jumping spiders.**
 How does a *Siler* jumping spider move like an ant? Murmur turns naturalistic
@@ -22,7 +26,24 @@ The demo renders four synthetic field videos (ants: smooth persistent
 walking; Siler: intermittent stop-and-go with jumps), runs the full
 pipeline, and writes a run directory containing `episodes.jsonl`,
 `summary.json` (including a first **mimicry fingerprint**), and
-`viz/index.html` — open the latter in any browser.
+`atlas/index.html` — **The Atlas**: serve it (`python -m http.server`
+inside the atlas dir) and open in a browser.
+
+### The Atlas experience
+
+- **Explore the flock** — the landing view is a living murmuration.
+  Particles are positioned by behavioral similarity only (species colors
+  hidden); each particle drifts along its episode's *real* sliding-window
+  embedding path z₁…z_t, so flock motion is data, not decoration.
+  Press **Reveal species** and the flock colors in over ~2 s — the moment
+  you discover which regions are ants, which are Siler.
+- **Explore a movement** — click any particle: the original video clip
+  plays, with live trajectory trace, speed sparkline, pause statistics,
+  and the **most similar movements** (nearest episodes in feature space)
+  playing alongside, each with its provenance chain.
+- **Explore a motif** — select a discovered motif (M0, M1, …) and the
+  rest of the flock fades while representative episodes are listed with
+  their species composition (🐜 🕷 🐜 …).
 
 ## Commands
 
@@ -49,9 +70,10 @@ python -m murmur viz murmur_runs/runs/<run_id>/episodes.jsonl --out murmuration.
    stop–go rhythm, sinuosity) *and* unsupervised structure (PCA behavioral
    space, k-means motifs). Mimicry is measured per dimension
    (Bhattacharyya overlap) toward a Behavioral Mimicry Fingerprint.
-6. **Visual motion is data.** In the murmuration: position = embedding,
-   color = label, flutter amplitude = movement intermittency (speed CV),
-   trails = real trajectories replayed at true fps.
+6. **Visual motion is data.** In the atlas: position = embedding path
+   (windowed, real drift through behavioral space), color = label,
+   flutter amplitude = movement intermittency (speed CV), clips = the
+   actual source-video frames.
 
 ## Status (V1)
 
