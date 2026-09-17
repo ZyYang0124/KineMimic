@@ -74,6 +74,9 @@ def load_shamble_episodes(mat_path: str | Path,
             frames=list(range(n)),
             centroids_px=xy.tolist(),           # already in cm-scale field units
             detection_confidence=[0.99] * n,
+            # sampling hierarchy: one lab dataset, sessions by date, one video per trial
+            site_id="shamble2017_dryad",
+            session_id=f"shamble2017_dryad/{str(getattr(tr, 'date', '')) or 'unknown_date'}",
             qc=TrajectoryQC(mean_detection_confidence=0.99,
                             coverage=float(good.mean())),
             environment=Environment(
@@ -82,7 +85,12 @@ def load_shamble_episodes(mat_path: str | Path,
                 date=str(getattr(tr, "date", "")) or None,
                 time=str(getattr(tr, "time", "")).strip() or None),
         )
-        # observation is publisher data; label is our annotation layer
+        # publisher/dataset species metadata is an independent (gold) annotation
+        ep.human_label = lbl
+        ep.human_confidence = 1.0
+        ep.human_source = "dataset:shamble2017_metadata"
+        ep.annotator = "dataset_metadata"
+        ep.annotation_status = "accepted"
         ep.bio_label = lbl
         ep.bio_label_confidence = 1.0
         ep.bio_label_source = "human:dataset_metadata"

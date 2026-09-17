@@ -1,14 +1,22 @@
 # MOTIONSCAPE — Design Document
 
+## Product shape
+
+MOTIONSCAPE / **The Murmur** / *Ant Mimicry* — an explorable atlas of
+animal movement whose first biological showcase is ant-mimicry in *Siler*
+jumping spiders. The codebase is species-agnostic: labels, importers, and
+the question string are showcase data, not architecture.
+
 ## Scientific question
 
-> How does a jumping spider (*Siler*) move like an ant — in which behavioral
-> dimensions, and how strongly?
+> How does a jumping spider (*Siler*) move like an ant — in which
+> behavioral dimensions, and how strongly?
 
-MOTIONSCAPE converts naturalistic video into millions-scale collections of short
-movement episodes and builds an explorable behavioral space, enabling both
-quantitative hypothesis tests (Siler vs ant overlap per dimension) and
-qualitative discovery (watching why two episodes are similar).
+Naturalistic video becomes a large collection of movement episodes; the
+episodes organize into an explorable behavioral space enabling quantitative
+comparison (per-dimension overlap with confidence from hierarchical
+bootstrap) and qualitative discovery (watching why two movements are
+similar).
 
 ## Pipeline
 
@@ -16,54 +24,95 @@ qualitative discovery (watching why two episodes are similar).
 Video → Detection → Movement Episode → Trajectory ┬→ Features (interpretable)
                                                    └→ Motifs (unsupervised)
                               Behavior Space → Comparative ethology → Mimicry
+       ↑ human annotation (independent layer)          ↑ labels overlaid, never
+       └─ workbench: QC + biological labels              used to build the space
 ```
-
-Later phases add Pose (foreleg-I ↔ antennae comparison), behavioral motifs
-from learned representations, and behavioral grammar (motif sequences).
 
 ## The movement episode (fundamental unit)
 
-`Episode` (murmur/schema.py): episode_id, source_video_id/path, frame range,
-fps, calibration, frames + centroids + bbox elongations + confidences,
-trajectory QC, environment, biological annotation, features, embedding,
-motif, and `processing_history` (list of Provenance records).
+`Episode` (motionscape/schema.py): episode_id, source_video_id/path, frame
+range, fps, calibration, frames + centroids + bbox elongations +
+confidences, trajectory QC, sampling hierarchy (site_id, session_id),
+environment, annotation fields, features, embedding, motif, and
+`processing_history` (list of Provenance records).
 
 - No long-term identity; reappearance → new episode.
 - QC: coverage, confidence, displacement sanity; episodes below
   `min_duration_s` are dropped (configurable).
 
-## Observation vs annotation
+## Observation ≠ annotation (two label layers)
 
-Observation fields are immutable after extraction. Biological labels are
-annotations: `bio_label`, confidence, source (`model:<name>` / `human`),
-plus a free-form `bio_label_detail` dict so `ant` can later become
-`ant + {genus: Crematogaster}` via appended annotation records
-(`EpisodeStore.add_annotation`) without touching observations.
+Observation fields are immutable after extraction. Labels live in two
+separate field groups:
+
+- `machine_label` / `machine_confidence` / `machine_source` — model
+  predictions. They share features with the movement analysis and are
+  **never** ground truth (circularity).
+- `human_label` / `human_confidence` / `human_source` / `annotator` /
+  `annotation_timestamp` / `annotation_status` — independent biological
+  annotation + QC review from the workbench (or dataset metadata).
+  `annotation_status` ∈ {unreviewed, accepted, rejected, tracking_failure,
+  severe_occlusion, edge_effect, too_short, ambiguous_taxon}. Rejected
+  episodes keep their observation data — review never deletes.
+
+`effective_label()` = human if present else machine; the legacy
+`bio_label` field mirrors it for v0.1 consumers. Refinements
+(ant → Crematogaster) append annotation records via
+`EpisodeStore.add_annotation` / the workbench without reprocessing.
+
+## Annotation log (append-only)
+
+`<store>/annotations/annotations.jsonl` — one AnnotationRecord per review
+event (label and/or QC state, annotator, timestamp, note). Applying the
+log is idempotent and order-respecting (latest wins); corrections are new
+records, never edits. `annotation.apply_log` replays it before analysis;
+the workbench writes one record per keystroke.
+
+## Sampling hierarchy (anti-pseudo-replication)
+
+Site → Session → Video → Episode is stored explicitly (site_id,
+session_id, source_video_id, episode_id). `hierarchy.py` builds the tree
+and provides cluster (hierarchical) bootstrap: whole sites resampled when
+≥2 sites exist, else sessions, else videos. Statistical claims must report
+the design levels, not bare episode counts.
 
 ## Provenance contract
 
 Every stage appends a Provenance record: software version, model name and
 version, parameters, UTC timestamp, parent ids. Runs live in
-`runs/<run_id>/` with `manifest.json`; nothing is overwritten — re-analysis
-creates a new run that references the old as parent.
+`runs/<run_id>/` with `manifest.json`; nothing is overwritten —
+re-analysis creates a new run referencing the old as parent. Atlas
+directories are likewise versioned (`atlas`, `atlas_v2`, …).
 
-## Visualization contract (Movement Murmuration)
+## Blind space contract
+
+The behavioral embedding (PCA of standardized kinematics) and motifs
+(k-means) receive **features only** — the API has no label input. Tests
+enforce it: re-running `analyze` with different human labels yields
+identical embeddings. Labels enter only afterwards: atlas overlays,
+fingerprint, motif occupancy.
+
+## Atlas contract (The Murmur)
 
 | Visual channel | Data mapping |
 |---|---|
-| Particle position | PCA embedding of kinematic features |
-| Color | biological label |
-| Flutter amplitude | speed_cv (movement intermittency) |
-| Trail / replay | real trajectory, true fps |
-| Click | provenance chain + feature table |
+| Particle position | behavioral embedding |
+| Drift path | episode's sliding-window embedding path z₁…z_t (static if unsupported) |
+| Flutter amplitude | speed_cv |
+| Color | hidden until Reveal → effective label |
+| Click | real clip + real time series + provenance chain |
+| Similar movements | nearest in standardized 16-D feature space (exact, k-d tree at scale) |
 
-Flutter is the only non-positional motion and is explicitly mapped to
-intermittency; no decorative animation is permitted.
+Scale: `data.json` ~0.32 KB/episode; per-episode detail in
+`meta/<id>.json`, fetched on selection; media generated on demand by
+`motionscape serve` (cached); one canvas for all particles. Benchmarks in
+`benchmarks/` and `docs/ATLAS.md`.
 
 ## Mimicry measurement
 
-Per dimension d, compare Siler and ant episode distributions with the
-Bhattacharyya coefficient (overlap in [0,1]). Dimensions: speed dynamics,
-intermittency, stop–go rhythm, turning, path shape, trajectory space.
-The vector of overlaps is the **Behavioral Mimicry Fingerprint**.
-Comparisons require the non-mimetic jumping-spider control to be meaningful.
+Per dimension d, Bhattacharyya coefficient between Siler and ant episode
+distributions (0–1): speed dynamics, intermittency, stop–go rhythm,
+turning, trajectory geometry, trajectory space. The vector is the
+**Behavioral Mimicry Fingerprint** — deliberately multi-dimensional; the
+UI never collapses it into a single score. Meaningful comparison requires
+human-reviewed labels and the non-mimetic jumping-spider control.

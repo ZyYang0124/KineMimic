@@ -103,11 +103,20 @@ def load_zeng_episodes(xlsx_path: str | Path, min_frames: int = 150) -> list[Epi
                 frames=list(range(len(arr))),
                 centroids_px=[],               # no xy published: velocity episode
                 detection_confidence=[1.0] * len(arr),
+                # sampling hierarchy: dataset > assay sheet > individual series
+                site_id="zeng2023_gait",
+                session_id=f"zeng2023_gait/{sheet}",
                 qc=TrajectoryQC(mean_detection_confidence=1.0, coverage=1.0),
                 environment=Environment(
                     site="Zeng et al. 2023 gait assay", field_or_lab="lab",
                     condition="gait assay"),
             )
+            # dataset metadata is an independent (gold) human annotation
+            ep.human_label = label
+            ep.human_confidence = 1.0
+            ep.human_source = "dataset:zeng2023_metadata"
+            ep.annotator = "dataset_metadata"
+            ep.annotation_status = "accepted"
             ep.bio_label = label
             ep.bio_label_confidence = 1.0
             ep.bio_label_source = "human:dataset_metadata"

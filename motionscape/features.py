@@ -23,14 +23,18 @@ def trajectory_features(centroids: list[list[float]], fps: float,
     def _mean(a: np.ndarray) -> float:
         return float(a.mean()) if len(a) else 0.0
 
-    xy_all = np.asarray(centroids, float)
+    xy_all = np.asarray(centroids, float).reshape(-1, 2)
     fr_all = np.asarray(frames, int) if frames is not None and len(frames) == len(xy_all) else np.arange(len(xy_all))
     # keep finite samples; a step only counts inside a continuous frame run,
     # so exit/re-entry teleports never contaminate kinematics
     keep = np.isfinite(xy_all).all(axis=1)
     xy, fr = xy_all[keep], fr_all[keep]
     if len(xy) < 2:
-        return {"duration_s": len(xy_all) * dt}
+        # degenerate input: zero-filled feature dict keeps matrix columns aligned
+        return dict.fromkeys(FEATURE_NAMES, 0.0)
+    steps_ = np.diff(fr)
+    step0 = int(np.bincount(steps_[steps_ > 0]).argmax()) if (steps_ > 0).any() else 1
+    dt0 = step0 / (fps or 30.0)
 
     scale = px_per_cm if px_per_cm else 1.0  # px -> cm
     xy_c = xy * scale

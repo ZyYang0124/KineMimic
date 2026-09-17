@@ -1,260 +1,659 @@
-"""MOTIONSCAPE atlas front-end template (self-contained, no build step)."""
+"""MOTIONSCAPE — The Murmur front-end (self-contained, no build step).
+
+Visual contract (what every channel means — nothing is decoration):
+
+- particle position : behavioral-space embedding (built WITHOUT species labels)
+- drift path        : the episode's real sliding-window embedding path z1..zt
+- flutter amplitude : movement intermittency (speed_cv)
+- color             : hidden until "Reveal species"
+- click             : the real episode — source video or faithful replay,
+                      real time series, provenance back to frames
+
+Science contract:
+
+- nearest neighbors come from the original standardized feature space,
+  never from 2-D screen distance;
+- before Reveal, no species identity is shown anywhere;
+- synthetic data would be labeled as such (this atlas is built by the same
+  pipeline as real runs and carries its run provenance in Data & provenance).
+"""
 
 TEMPLATE = r"""<!DOCTYPE html>
 <html lang="zh">
 <head>
 <meta charset="utf-8">
-<title>MOTIONSCAPE — Explore how animals move</title>
+<title>MOTIONSCAPE — The Murmur · An atlas of animal movement</title>
 <style>
- body{margin:0;background:#06090e;color:#d8e2ec;font:14px/1.5 system-ui,sans-serif;overflow:hidden}
- #stage{display:flex;height:100vh}
- #galaxy{flex:1;display:block;cursor:crosshair}
- #panel{width:420px;padding:16px;overflow-y:auto;border-left:1px solid #16212d;background:#0a1017}
- h1{font-size:17px;margin:0 0 2px;color:#9fe8df;letter-spacing:.5px}
- .muted{color:#64798d;font-size:12px}
- button.mbtn{margin:6px 6px 0 0;padding:6px 12px;border:1px solid #2a4a55;border-radius:16px;background:#0e1a22;color:#9fe8df;font-size:12px;cursor:pointer}
- button.mbtn:hover{background:#14303a}
- .chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
- .chip{padding:3px 10px;border-radius:12px;border:1px solid #22333f;background:#0d151d;font-size:12px;cursor:pointer;color:#8fa8bc}
- .chip.on{background:#1b3a44;color:#c8f2ec;border-color:#3b6a75}
- .clip{width:100%;border-radius:8px;background:#000;margin:4px 0}
- .nbr{display:flex;gap:8px;align-items:center;padding:6px;border-radius:8px;cursor:pointer;border:1px solid transparent}
+ :root{--bg:#06090e;--ink:#d8e2ec;--dim:#64798d;--line:#16212d;--accent:#9fe8df;--panel:#0a1017ee}
+ *{box-sizing:border-box}
+ body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,sans-serif;overflow:hidden}
+ #galaxy{position:fixed;inset:0;display:block;cursor:crosshair}
+ /* ---------- top bar ---------- */
+ header{position:fixed;top:0;left:0;right:0;display:flex;align-items:center;gap:14px;
+   padding:10px 18px;background:linear-gradient(#06090eee,#0609000);z-index:8;pointer-events:none}
+ header>*{pointer-events:auto}
+ #brand{font-size:15px;letter-spacing:1.5px;color:var(--accent)}
+ #brand small{display:block;font-size:11px;letter-spacing:.3px;color:var(--dim);font-weight:400}
+ #dataset{font-size:12px;color:var(--dim)}
+ header .sp{flex:1}
+ .btn{padding:7px 16px;border:1px solid #2a4a55;border-radius:18px;background:#0e1a22dd;
+   color:var(--accent);font-size:13px;cursor:pointer;transition:background .3s}
+ .btn:hover{background:#14303a}
+ .btn.primary{border-color:#3b6a75}
+ /* ---------- blind note ---------- */
+ #blindnote{position:fixed;left:18px;bottom:16px;max-width:430px;font-size:12px;color:var(--dim);
+   z-index:4;transition:opacity 1s;pointer-events:none}
+ #blindnote b{color:#8fa8bc;font-weight:500}
+ /* ---------- legend (post-reveal) ---------- */
+ #legend{position:fixed;left:18px;bottom:52px;display:none;flex-direction:column;gap:4px;
+   font-size:12px;color:var(--ink);z-index:4;background:#06090eaa;padding:8px 12px;border-radius:10px}
+ #legend .dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:7px;vertical-align:-1px}
+ /* ---------- right panel ---------- */
+ #panel{position:fixed;top:0;right:0;bottom:0;width:410px;background:var(--panel);
+   border-left:1px solid var(--line);backdrop-filter:blur(6px);transform:translateX(105%);
+   transition:transform .35s cubic-bezier(.2,.8,.2,1);z-index:6;overflow-y:auto;padding:60px 16px 16px}
+ #panel.open{transform:translateX(0)}
+ h1{font-size:15px;margin:0;color:var(--accent);letter-spacing:.5px;font-weight:500}
+ .muted{color:var(--dim);font-size:12px}
+ .lbl{font-size:12px;padding:1px 9px;border-radius:10px;background:#1c2833;display:inline-block}
+ .clip{width:100%;border-radius:8px;background:#04070b;margin:6px 0;display:block;min-height:60px}
+ .nbr{display:flex;gap:10px;align-items:center;padding:6px;border-radius:8px;cursor:pointer;border:1px solid transparent}
  .nbr:hover{background:#101a24;border-color:#1f303d}
- .nbr img{width:110px;border-radius:6px;background:#000}
- .lbl{font-size:12px;padding:1px 8px;border-radius:10px;background:#1c2833}
- .prov{font-family:ui-monospace,monospace;font-size:10px;color:#6d8ba3;white-space:pre-wrap;margin-top:8px;border-left:2px solid #1f2f3d;padding-left:8px}
- canvas.spark{width:100%;height:44px;background:#0c141c;border-radius:6px;margin:2px 0}
- .rowlab{font-size:10px;color:#64798d;width:52px;display:inline-block}
- .split{display:flex;gap:8px}.split>div{flex:1}
- .bar{height:12px;border-radius:3px;display:inline-block;vertical-align:middle}
- #river{width:100%;height:120px;background:#0c141c;border-radius:8px;margin:8px 0;cursor:pointer}
- #hero{position:fixed;inset:0;background:#06090e;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9;transition:opacity 1.2s}
- #hero h2{font-size:30px;color:#cfeee9;font-weight:300;letter-spacing:2px;margin:0}
- #home{text-align:center;margin-top:40%}
+ .nbr img{width:96px;height:60px;object-fit:cover;border-radius:6px;background:#04070b}
+ .nbr canvas{width:96px;height:60px;border-radius:6px;background:#04070b}
+ .prov{font-family:ui-monospace,monospace;font-size:10px;color:#6d8ba3;white-space:pre-wrap;
+   margin-top:8px;border-left:2px solid #1f2f3d;padding-left:8px}
+ canvas.spark{width:100%;height:40px;background:#0c141c;border-radius:6px;margin:2px 0;display:block}
+ .rowlab{font-size:10px;color:var(--dim);width:52px;display:inline-block;vertical-align:top;padding-top:12px}
+ .rowwrap{display:flex;align-items:center}.rowwrap>div{flex:1}
+ .split{display:flex;gap:10px}.split>div{flex:1;min-width:0}
+ .bar{height:11px;border-radius:3px;display:inline-block;vertical-align:middle}
+ .chip{padding:3px 10px;border-radius:12px;border:1px solid #22333f;background:#0d151d;font-size:12px;
+   cursor:pointer;color:#8fa8bc;display:inline-block;margin:0 6px 6px 0}
+ .chip.on{background:#1b3a44;color:#c8f2ec;border-color:#3b6a75}
+ .fprow{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:12px}
+ .fprow .name{width:130px;color:#b8c8d8}
+ .fprow .track{flex:1;height:11px;background:#101a24;border-radius:3px;position:relative}
+ .fprow .fill{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:#4fd1c5}
+ .fprow.future .fill{background:#2a3a4a}
+ .tabbar{display:flex;gap:6px;margin:10px 0;flex-wrap:wrap}
+ input.txt,textarea.txt{width:100%;background:#0e1a22;border:1px solid #2a4a55;color:var(--ink);
+   border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit}
+ .fps{position:fixed;right:12px;bottom:10px;font-size:10px;color:#3a4a5a;z-index:4}
+ /* ---------- hero ---------- */
+ #hero{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;
+   justify-content:center;z-index:20;transition:opacity 1.4s;cursor:pointer}
+ #heroCv{width:min(560px,80vw);height:280px}
+ #heroQ{font-size:clamp(22px,3.4vw,32px);color:#cfeee9;font-weight:300;letter-spacing:2px;
+   margin:18px 0 6px;opacity:0;transition:opacity 1.6s;text-align:center}
+ #heroSub{font-size:13px;color:var(--dim);opacity:0;transition:opacity 1.6s;text-align:center;max-width:560px;padding:0 20px}
+ #heroHint{position:absolute;bottom:26px;font-size:11px;color:#3a4a5a}
+ @media (prefers-reduced-motion: reduce){
+   #panel{transition:none}
+ }
 </style>
 </head>
 <body>
+<canvas id="galaxy"></canvas>
+
+<header>
+ <div id="brand">MOTIONSCAPE<small>an atlas of animal movement · The Murmur</small></div>
+ <div id="dataset"></div>
+ <div class="sp"></div>
+ <button class="btn" id="exploreBtn">☰ Explore</button>
+ <button class="btn primary" id="revealBtn">✦ Reveal species</button>
+</header>
+
+<div id="blindnote"><b>1 particle = 1 real movement episode.</b> Position = behavioral
+ similarity, drift = the episode's own path through movement space, quiver = intermittency.
+ <span id="blindline">This space was built without knowing what any animal is — only how it moves.</span></div>
+
+<div id="legend"></div>
+<div class="fps" id="fps"></div>
+
+<div id="panel"></div>
+
 <div id="hero">
-  <div id="heroTraj" style="width:520px;height:260px"></div>
-  <h2>How does a spider move like an ant?</h2>
-  <div class="muted" style="margin-top:10px">MOTIONSCAPE · 每个粒子 = 一段真实运动 · 点击进入运动宇宙</div>
+ <canvas id="heroCv" width="1120" height="560"></canvas>
+ <div id="heroQ">How does a spider move like an ant?</div>
+ <div id="heroSub">MOTIONSCAPE · The Murmur — thousands of real movements, one explorable space.<br>
+   先看运动本身。物种身份,由你决定何时揭示。</div>
+ <div id="heroHint">click to enter · 点击进入</div>
 </div>
-<div id="stage">
- <canvas id="galaxy"></canvas>
- <div id="panel">
-  <h1>MOTIONSCAPE · Movement Galaxy</h1>
-  <div class="muted">粒子按运动相似性排列，沿真实滑窗嵌入轨迹漂移；抖动=运动间歇性。物种颜色默认隐藏——先看到行为世界本身。</div>
-  <button class="mbtn" id="revealBtn">✦ Reveal species</button>
-  <button class="mbtn" id="riverBtn">~ Behavior River</button>
-  <div id="riverWrap" style="display:none"></div>
-  <div class="chips" id="motifChips"></div>
-  <div id="detail"><div id="home"><div style="font-size:38px">͘·͘·͘·</div><div class="muted">Explore the flock — 点击任意粒子</div></div></div>
- </div>
-</div>
+
 <script>
-const COLORS={ant:"#e8a13c",mimic:"#4fd1c5",siler:"#4fd1c5",other_spider:"#b794f4",other_arthropod:"#a0aec0",unknown:"#718096"};
-const NAMES={ant:"Ant",mimic:"Mimic spider",other_spider:"Other spider",siler:"Mimic spider",unknown:"Unknown"};
-const HIDDEN="#5a6b7d";
-let revealed=0, revealTarget=0, motifSel=-1, sel=-1, T=0;
+"use strict";
+/* ================= data ================= */
+let META=null, EP=[], IDX={}, serverMode=false;
+let revealed=false, revealT=0, sel=-1, motifSel=-1, T=0;
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const COLORS={ant:"#e8a13c",mimic:"#4fd1c5",siler:"#4fd1c5",other_spider:"#b794f4",
+              other_arthropod:"#a0aec0",unknown:"#718096"};
+const NAMES={ant:"Ant",mimic:"Mimic spider (Myrmarachne)",siler:"Siler",
+             other_spider:"Other spider",other_arthropod:"Other arthropod",unknown:"Unknown"};
+const HIDDEN="#56677a";
 const cv=document.getElementById('galaxy'),cx=cv.getContext('2d');
-function fit(){cv.width=innerWidth-420;cv.height=innerHeight;}addEventListener('resize',fit);fit();
+const panel=document.getElementById('panel');
+let DPR=Math.min(devicePixelRatio||1,1.5);
+function fit(){cv.width=(innerWidth)*DPR;cv.height=innerHeight*DPR;cv.style.width=innerWidth+'px';cv.style.height=innerHeight+'px';}
+addEventListener('resize',fit);fit();
 
-fetch('data.json').then(r=>r.json()).then(d=>init(d.episodes));
-let EP=[];
+fetch('data.json').then(r=>r.json()).then(d=>{boot(d);});
+fetch('api/info').then(r=>r.ok?r.json():null).then(i=>{serverMode=!!i&&!!i.clip_endpoint;}).catch(()=>{});
 
-function init(eps){
- EP=eps.map(e=>({...e}));
- let xs=[],ys=[];EP.forEach(e=>e.path.forEach(p=>{xs.push(p[0]);ys.push(p[1]);}));
- const xmin=Math.min(...xs),xmax=Math.max(...xs),ymin=Math.min(...ys),ymax=Math.max(...ys);
- EP.forEach(e=>{e.px=e.path.map(p=>[0.07+(p[0]-xmin)/(xmax-xmin+1e-9)*0.86,
-                                    0.92-(p[1]-ymin)/(ymax-ymin+1e-9)*0.84]);});
- const mc=document.getElementById('motifChips');
- const counts={};EP.forEach(e=>counts[e.motif]=(counts[e.motif]||0)+1);
- Object.entries(counts).sort((a,b)=>a[0]-b[0]).forEach(([m,c])=>{
-   const b=document.createElement('span');b.className='chip';b.textContent=`M${m} · ${c}`;
-   b.onclick=()=>{m=+m;motifSel=(motifSel===m)?-1:m;
-     [...mc.children].forEach(x=>x.classList.remove('on'));
-     if(motifSel==m)b.classList.add('on');showMotif(motifSel);};
-   mc.appendChild(b);});
- hero(EP.find(e=>e.bio_label==='mimic'||e.bio_label==='siler')||EP[0]);
- requestAnimationFrame(draw);
-}
-
-/* ---------- hero: one real trajectory grows, then enter the universe ---------- */
-let heroDone=false;
-function hero(e){
-  const c=document.createElement('canvas');c.width=1040;c.height=520;
-  c.style.width='520px';c.style.height='260px';
-  document.getElementById('heroTraj').appendChild(c);
-  const g=c.getContext('2d');
-  const tr=e.trajectory; if(!tr||tr.length<2)return;
-  const x0=Math.min(...tr.map(p=>p[0])),x1=Math.max(...tr.map(p=>p[0])),
-        y0=Math.min(...tr.map(p=>p[1])),y1=Math.max(...tr.map(p=>p[1]));
-  const P=p=>[60+(p[0]-x0)/(x1-x0+1e-9)*920, 460-(p[1]-y0)/(y1-y0+1e-9)*400];
-  let i=0; const col=COLORS[e.bio_label];
-  const tick=()=>{
-    if(heroDone)return;
-    g.fillStyle='rgba(6,9,14,.25)';g.fillRect(0,0,c.width,c.height);
-    g.strokeStyle=col;g.lineWidth=3;g.beginPath();
-    for(let k=0;k<=i;k++){const q=P(tr[k]);k?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1]);}
-    g.stroke();
-    if(i<tr.length-1){i+=Math.max(1,Math.round(tr.length/90));requestAnimationFrame(tick);}
-    else{i=0;setTimeout(()=>{if(!heroDone)tick();},1200);}
-  };
-  tick();
-  document.getElementById('hero').onclick=()=>{
-    heroDone=true;
-    const h=document.getElementById('hero');h.style.opacity=0;
-    setTimeout(()=>h.remove(),1300);
-  };
-}
-
-function col(e){return mix(HIDDEN,COLORS[e.bio_label]||COLORS.unknown,revealed);}
-function mix(a,b,t){const pa=parseInt(a.slice(1),16),pb=parseInt(b.slice(1),16);
-  const r=(pa>>16)+(((pb>>16)-(pa>>16))*t),g=((pa>>8)&255)+((((pb>>8)&255)-((pa>>8)&255))*t),
-        bl=(pa&255)+(((pb&255)-(pa&255))*t);
-  return `rgb(${r|0},${g|0},${bl|0})`;}
-function pos(e){
-  if(e.px.length===1)return e.px[0];
-  const u=(T*0.008)%1,i=Math.min(Math.floor(u*(e.px.length-1)),e.px.length-2),f=u*(e.px.length-1)-i;
-  return [e.px[i][0]+(e.px[i+1][0]-e.px[i][0])*f, e.px[i][1]+(e.px[i+1][1]-e.px[i][1])*f];
-}
-function draw(){
- T++;
- if(revealed<revealTarget)revealed=Math.min(revealed+0.012,revealTarget);
- cx.fillStyle='#06090e';cx.fillRect(0,0,cv.width,cv.height);
- cx.strokeStyle='rgba(50,70,90,.10)';
- for(let i=1;i<6;i++){cx.beginPath();cx.moveTo(cv.width*i/6,0);cx.lineTo(cv.width*i/6,cv.height);cx.stroke();
-   cx.beginPath();cx.moveTo(0,cv.height*i/6);cx.lineTo(cv.width,cv.height*i/6);cx.stroke();}
- EP.forEach((e,i)=>{
-   const p=pos(e),fl=(e.speed_cv||0)*3;
-   const x=p[0]*cv.width+Math.sin(T*0.013+i*2.1)*fl*1.1;
-   const y=p[1]*cv.height+Math.cos(T*0.011+i*1.7)*fl*1.1;
-   e.sx=x;e.sy=y;
-   const inM=(motifSel<0||e.motif===motifSel);
-   cx.globalAlpha=inM?(i===sel?1:0.85):0.10;
-   cx.beginPath();cx.fillStyle=col(e);
-   cx.arc(x,y,i===sel?7:4,0,7);cx.fill();
+function boot(d){
+ META=d.meta;
+ EP=d.episodes.map(e=>{
+   const o={...e, nn:e.nn||[]};
+   IDX[o.id]=o; return o;
  });
- cx.globalAlpha=1;
+ scaleEmbeddings();
+ document.getElementById('dataset').textContent=
+   `${META.n_episodes.toLocaleString()} movements · ${META.hierarchy.n_videos} videos · ${META.hierarchy.n_sites} site(s) · build ${META.build_seconds}s`;
+ hero();
  requestAnimationFrame(draw);
 }
+/* embed PCA coords -> [0..1]^2 (padded), deterministic across builds */
+function scaleEmbeddings(){
+ let xs=Infinity,xa=-Infinity,ys=Infinity,ya=-Infinity;
+ EP.forEach(e=>{const p=e.p[0]||e.e;xs=Math.min(xs,p[0]);xa=Math.max(xa,p[0]);ys=Math.min(ys,p[1]);ya=Math.max(ya,p[1]);});
+ const sx=1/(xa-xs+1e-9), sy=1/(ya-ys+1e-9);
+ EP.forEach((e,i)=>{
+   e.base=e.p.map(q=>[0.06+(q[0]-xs)*sx*0.88, 0.94-(q[1]-ys)*sy*0.88]);
+   e.phase=(hash(e.id)%1000)/1000;                       // per-episode drift phase
+   e.period=Math.min(40,Math.max(9,(e.d||6)*2.2));       // loop ∝ real duration (clamped)
+ });
+}
+function hash(s){let h=9;for(let i=0;i<s.length;i++)h=Math.imul(h^s.charCodeAt(i),387420489);return h>>>0;}
+
+/* ================= hero: four stages from one real trajectory ================= */
+let heroStage=0;
+function hero(){
+ const h=document.getElementById('hero');
+ if(REDUCED){h.remove();return;}
+ const c=document.getElementById('heroCv'),g=c.getContext('2d');
+ const tr=(META.hero&&META.hero.trajectory)||[];
+ if(tr.length<2){h.remove();return;}
+ const x0=Math.min(...tr.map(p=>p[0])),x1=Math.max(...tr.map(p=>p[0])),
+       y0=Math.min(...tr.map(p=>p[1])),y1=Math.max(...tr.map(p=>p[1]));
+ const P=p=>[80+(p[0]-x0)/(x1-x0+1e-9)*(c.width-160), 480-(p[1]-y0)/(y1-y0+1e-9)*400];
+ let i=0;
+ const t1=setTimeout(()=>document.getElementById('heroQ').style.opacity=1,900);
+ const t2=setTimeout(()=>document.getElementById('heroSub').style.opacity=1,3200);
+ const t3=setTimeout(()=>{heroStage=1;spawn();},2600);
+ const t4=setTimeout(enter,6400);
+ function spawn(){ /* stage 2→3: particles fade in at center, then glide home */
+   EP.forEach((e,k)=>{e.heroDelay=k/Math.max(EP.length,1)*1.4;});
+ }
+ let born=0;
+ (function tick(){
+   if(heroStage===2)return;
+   g.fillStyle='rgba(6,9,14,.28)';g.fillRect(0,0,c.width,c.height);
+   if(i<tr.length-1)i+=Math.max(1,Math.round(tr.length/120));
+   g.strokeStyle='#4fd1c5';g.lineWidth=3;g.beginPath();
+   for(let k=0;k<=Math.min(i,tr.length-1);k++){const q=P(tr[k]);k?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1]);}
+   g.stroke();
+   if(heroStage>=1){ /* real trajectories dissolve into the flock */
+     born=Math.min(EP.length,born+Math.ceil(EP.length/90));
+     g.fillStyle='#56677a';
+     const drawN=Math.min(born,2000);          // hero is an intro, not a benchmark
+     for(let k=0;k<drawN;k++){const e=EP[k];e.heroDelay-=0.016;if(e.heroDelay>0)continue;
+       const b=e.base[0];const u=Math.min(1,(1.4-Math.max(e.heroDelay,0))/1.4);
+       const hx=c.width/2+(b[0]-0.5)*0.02, hy=c.height/2+(b[1]-0.5)*0.02;
+       const gx=b[0]*c.width, gy=b[1]*c.height;
+       g.globalAlpha=.5*u;g.beginPath();g.arc(hx+(gx-hx)*u,hy+(gy-hy)*u,3,0,7);g.fill();}
+     g.globalAlpha=1;
+   }
+   requestAnimationFrame(tick);
+ })();
+ h.onclick=()=>{clearTimeout(t1);clearTimeout(t2);clearTimeout(t3);clearTimeout(t4);enter();};
+ function enter(){heroStage=2;EP.forEach(e=>delete e.heroDelay);h.style.opacity=0;setTimeout(()=>h.remove(),1500);}
+}
+
+/* ================= The Murmur ================= */
+function col(e,t){ // t: reveal progress 0..1
+ if(t<=0)return HIDDEN;
+ return mix(HIDDEN,COLORS[e.l]||COLORS.unknown,t);
+}
+function mix(a,b,t){const pa=parseInt(a.slice(1),16),pb=parseInt(b.slice(1),16);
+ const r=(pa>>16)+(((pb>>16)-(pa>>16))*t),g=((pa>>8)&255)+((((pb>>8)&255)-((pa>>8)&255))*t),
+       bl=(pa&255)+(((pb&255)-(pa&255))*t);
+ return `rgb(${r|0},${g|0},${bl|0})`;}
+function pos(e){
+ const b=e.base; if(b.length<2||REDUCED)return b[0];
+ const u=((T/60)/e.period+e.phase)%1;   // T ticks per frame; T/60 ≈ seconds
+ const i=Math.min(Math.floor(u*(b.length-1)),b.length-2),f=u*(b.length-1)-i;
+ return [b[i][0]+(b[i+1][0]-b[i][0])*f, b[i][1]+(b[i+1][1]-b[i][1])*f];
+}
+let frames=0,fpsT=performance.now();
+function draw(){
+ T+=REDUCED?0:1;
+ if(revealT<(revealed?1:0))revealT=Math.min(revealT+(REDUCED?1:0.008),revealed?1:0);
+ if(revealT>(revealed?1:0))revealT=Math.max(revealT-0.008,0);
+ const W=cv.width,H=cv.height;
+ cx.fillStyle='#06090e';cx.fillRect(0,0,W,H);
+ cx.strokeStyle='rgba(50,70,90,.08)';
+ for(let i=1;i<6;i++){cx.beginPath();cx.moveTo(W*i/6,0);cx.lineTo(W*i/6,H);cx.stroke();
+   cx.beginPath();cx.moveTo(0,H*i/6);cx.lineTo(W,H*i/6);cx.stroke();}
+ const drift=T>0;
+ cx.fillStyle='#06090e';
+ for(let i=0;i<EP.length;i++){
+   const e=EP[i],p=drift?pos(e):e.base[0];
+   const fl=REDUCED?0:(e.cv||0)*3.2;
+   const x=p[0]*W+Math.sin(T*0.013+e.phase*40)*fl*DPR;
+   const y=p[1]*H+Math.cos(T*0.011+e.phase*53)*fl*DPR;
+   e.sx=x;e.sy=y;
+   const inFocus=(motifSel<0||e.m===motifSel);
+   const a=i===sel?1:(inFocus?0.82:0.07);
+   cx.globalAlpha=a;
+   cx.fillStyle=i===sel?'#ffffff':col(e,revealT);
+   cx.beginPath();cx.arc(x,y,(i===sel?7:3.6)*DPR,0,7);cx.fill();
+   if(i===sel){cx.strokeStyle=col(e,revealT);cx.lineWidth=2*DPR;
+     cx.beginPath();cx.arc(x,y,11*DPR,0,7);cx.stroke();}
+ }
+ cx.globalAlpha=1;
+ frames++;const now=performance.now();
+ if(now-fpsT>1500){document.getElementById('fps').textContent=
+   `${Math.round(frames*1000/(now-fpsT))} fps · ${EP.length.toLocaleString()} particles`;frames=0;fpsT=now;}
+ if(!document.hidden)requestAnimationFrame(draw);
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)requestAnimationFrame(draw);});
+
+/* ---------- selection & region exploration ---------- */
 cv.addEventListener('click',ev=>{
- const r=cv.getBoundingClientRect();let best=-1,bd=1e9;
- EP.forEach((e,i)=>{const d=(ev.clientX-r.left-e.sx)**2+(ev.clientY-r.top-e.sy)**2;if(d<bd){bd=d;best=i;}});
- if(bd<500){sel=best;showMovement(EP[best]);}
+ if(document.getElementById('hero'))return;
+ const r=cv.getBoundingClientRect(),mx=(ev.clientX-r.left)*DPR,my=(ev.clientY-r.top)*DPR;
+ let best=-1,bd=1e9;
+ for(let i=0;i<EP.length;i++){const e=EP[i];if(e.sx===undefined)continue;
+   const d=(mx-e.sx)**2+(my-e.sy)**2;if(d<bd){bd=d;best=i;}}
+ if(bd<(14*DPR)**2)select(best);
+ else{ /* empty space: explore this region of movement space */
+   const near=[];
+   for(let i=0;i<EP.length;i++){const e=EP[i];if(e.sx===undefined)continue;
+     const d=Math.hypot(mx-e.sx,my-e.sy);if(d<90*DPR)near.push([d,i]);}
+   if(near.length>=3)showRegion(near.sort((a,b)=>a[0]-b[0]));
+ }
+});
+function select(i){sel=i;fetchMeta(EP[i].id).then(m=>m&&showMovement(EP[i],m));openPanel();}
+function showById(id){const i=EP.findIndex(x=>x.id===id);if(i>=0)select(i);}
+addEventListener('keydown',ev=>{
+ if(ev.target.tagName==='INPUT'||ev.target.tagName==='TEXTAREA')return;
+ if(ev.key==='Escape'){sel=-1;panel.classList.remove('open');}
+ if(ev.key.toLowerCase()==='r')toggleReveal();
+ if(ev.key.toLowerCase()==='c'&&sel>=0)compare(sel);
 });
 
-/* ---------- Explore a movement: clip + speed/turn/moving rows ---------- */
-function showMovement(e){
- const s=e.series||{speed:[0],turn:[0],moving:[0]};
- const nearestAnt=(e.neighbors||[]).find(n=>n.bio_label==='ant');
- document.getElementById('detail').innerHTML=`
-  <div><span class="lbl" style="color:${COLORS[e.bio_label]}">${NAMES[e.bio_label]||e.bio_label}</span>
-   <span class="muted">${e.species_detail?'· '+e.species_detail:''} · ${e.duration_s.toFixed(1)}s · M${e.motif} · ${e.video_id}
-   ${e.clip_kind==='video'?' · 原始视频':' · 轨迹回放'}</span></div>
-  <img class="clip" src="${e.clip}">
-  <div class="muted">speed / turn / moving —— 真实时间序列</div>
-  ${sparkRow('speed',s.speed,'#4fd1c5')}${sparkRow('turn',s.turn,'#e8a13c')}${sparkRow('moving',s.moving,'#b794f4')}
-  ${nearestAnt?`<button class="mbtn" onclick="compare('${e.episode_id}')">⇄ Compare with nearest ant</button>`:''}
-  <div style="margin-top:10px;color:#9fe8df">Most similar movements</div>
-  ${(e.neighbors||[]).map(n=>`<div class="nbr" onclick="showById('${n.episode_id}')">
-     <img src="${n.clip}"><div><span class="lbl" style="color:${COLORS[n.bio_label]}">${NAMES[n.bio_label]||n.bio_label}</span>
-     <div class="muted">similarity ${n.similarity.toFixed(2)}</div></div></div>`).join('')}
-  <div class="prov">${e.provenance_chain.join('\n')}</div>`;
- renderSparks(s);
-}
-function showById(id){const i=EP.findIndex(x=>x.episode_id===id);if(i>=0){sel=i;showMovement(EP[i]);}}
-function sparkRow(lab,arr,c){
- return `<div><span class="rowlab">${lab}</span><canvas class="spark" width="760" height="88" data-lab="${lab}" data-c="${c}"></canvas></div>`;}
-function renderSparks(s){
- document.querySelectorAll('canvas.spark').forEach(c=>{
-  const arr=s[c.dataset.lab];if(!arr)return;
-  const g=c.getContext('2d');const mx=Math.max(...arr,1e-9);
-  g.strokeStyle=c.dataset.c;g.lineWidth=3;g.beginPath();
-  arr.forEach((v,i)=>{const x=i/(arr.length-1||1)*c.width,y=c.height-6-(v/mx)*(c.height-12);
-    i?g.lineTo(x,y):g.moveTo(x,y);});g.stroke();});
+/* ================= lazy meta ================= */
+const metaCache={};
+function fetchMeta(id){
+ if(metaCache[id])return Promise.resolve(metaCache[id]);
+ return fetch(`meta/${id}.json`).then(r=>r.json()).then(m=>{metaCache[id]=m;return m;})
+        .catch(()=>null);
 }
 
-/* ---------- Compare with nearest ant: split view ---------- */
-window.compare=function(id){
- const e=EP.find(x=>x.episode_id===id);
- const n=(e.neighbors||[]).find(x=>x.bio_label==='ant');if(!n)return;
- const o=EP.find(x=>x.episode_id===n.episode_id);if(!o)return;
- document.getElementById('detail').innerHTML=`
-  <div class="split">
-   <div><span class="lbl" style="color:${COLORS[e.bio_label]}">${NAMES[e.bio_label]}</span>
-     <img class="clip" src="${e.clip}">
-     ${sparkRow('speed',e.series.speed,COLORS[e.bio_label])}</div>
-   <div><span class="lbl" style="color:${COLORS.ant}">Ant</span>
-     <img class="clip" src="${o.clip}">
-     ${sparkRow('speed',o.series.speed,COLORS.ant)}</div>
+/* ================= movement detail ================= */
+function labelChip(e){
+ if(!revealed)return `<span class="lbl" style="color:#8fa8bc">movement</span>`;
+ return `<span class="lbl" style="color:${COLORS[e.l]}">${NAMES[e.l]||e.l}</span>`;
+}
+function showMovement(e,m){
+ const nn=(m.neighbors||[]);
+ const other=nn.find(n=>revealed&&n.label!==e.l)||null;
+ panel.innerHTML=`
+  <div style="display:flex;align-items:center;gap:8px">
+   ${labelChip(e)}
+   <span class="muted">${e.d.toFixed(1)}s · motif M${e.m} · ${e.st!=='unreviewed'?'QC: '+e.st:'unreviewed'}</span>
+   <span class="sp" style="flex:1"></span>
+   <button class="btn" style="padding:3px 10px" onclick="closePanel()">esc</button></div>
+  <div class="muted">${m.species_detail?'· '+m.species_detail+' · ':''}${m.video_id} · frames ${m.frames[0]}–${m.frames[1]}${m.sampling.site?' · '+esc(m.sampling.site):''}</div>
+  <div id="clipwrap"><img class="clip" id="mainclip" alt="movement clip"></div>
+  <div class="muted">speed / turn / moving — real time series (replay below is the real trajectory, time-normalized)</div>
+  <div id="rows">${sparkRow('speed','#4fd1c5')}${sparkRow('turn','#e8a13c')}${sparkRow('moving','#b794f4')}</div>
+  <div style="display:flex;gap:8px;margin:8px 0">
+    <button class="btn" id="playBtn" style="padding:4px 14px">⏸ pause</button>
+    ${nn.length?`<button class="btn" onclick="compare()">⇄ compare with nearest movement${revealed&&other?' (nearest '+(NAMES[other.label]||other.label).split(' ')[0]+')':''}</button>`:''}
   </div>
-  <div class="muted">并排对照：两段真实运动同源时间序列。相似度 ${n.similarity.toFixed(2)}（d=${n.dist.toFixed(2)}）。</div>
-  <button class="mbtn" onclick="showById('${e.episode_id}')">← back</button>
-  <div class="prov">${e.provenance_chain.join('\n')}\n--- nearest ant ---\n${o.provenance_chain.join('\n')}</div>`;
- renderSparks(e.series);renderSparks(o.series);
+  <div style="margin-top:6px;color:var(--accent)">Similar movements <span class="muted">— nearest in ${META.features.length}-D feature space, not screen distance</span></div>
+  <div id="nnlist">${nn.map((n,k)=>{
+     const ne=IDX[n.episode_id]||{};
+     const name=revealed?`<span class="lbl" style="color:${COLORS[ne.l]}">${NAMES[ne.l]||ne.l}</span>`
+                        :`<span class="lbl" style="color:#8fa8bc">Movement ${k+1}</span>`;
+     return `<div class="nbr" onclick="showById('${n.episode_id}')">
+       <canvas width="192" height="120" data-traj="${n.episode_id}"></canvas>
+       <div>${name}<div class="muted">similarity ${n.similarity.toFixed(2)} · ${(ne.d||0).toFixed(1)}s</div></div></div>`;
+   }).join('')}</div>
+  <div class="muted" style="margin-top:8px">Provenance — every claim traces back here</div>
+  <div class="prov">${esc(m.provenance_chain.join('\n'))}</div>`;
+ openPanel();
+ // clip: real video when served; graceful in-browser replay otherwise
+ const img=panel.querySelector('#mainclip');
+ if(serverMode&&m.clip_kind==='video'){img.src=`clip/${e.id}.gif`;img.onerror=()=>replayFallback(img,m,e);}
+ else replayFallback(img,m,e);
+ drawSeries(m);
+ startSyncReplay([m],[panel.querySelector('#rows')],panel.querySelector('#playBtn'));
+ nn.forEach(n=>{const ne=IDX[n.episode_id];if(ne)fetchMeta(n.episode_id).then(nm=>{
+    if(!nm)return;const c=panel.querySelector(`canvas[data-traj="${n.episode_id}"]`);
+    if(c)drawStaticReplay(c,nm.trajectory||[],revealed?(COLORS[ne.l]||'#4fd1c5'):'#56677a');});});
+}
+function replayFallback(img,m,e){
+ // in-browser trajectory replay (the real path; used when no server media).
+ // startSyncReplay picks this canvas up and animates it on the shared clock.
+ const c=document.createElement('canvas');c.className='clip';c.width=720;c.height=400;
+ img.replaceWith(c);
+}
+function sparkRow(lab,c){
+ return `<div class="rowwrap"><span class="rowlab">${lab}</span><div>
+   <canvas class="spark" width="640" height="80" data-lab="${lab}" data-c="${c}"></canvas></div></div>`;}
+function drawSeries(m){
+ panel.querySelectorAll('canvas.spark').forEach(c=>{
+   const arr=(m.series||{})[c.dataset.lab]||[0];c._arr=arr;
+   const g=c.getContext('2d'),mx=Math.max(...arr,1e-9);
+   g.clearRect(0,0,c.width,c.height);g.strokeStyle=c.dataset.c;g.lineWidth=2.5;g.beginPath();
+   arr.forEach((v,i)=>{const x=i/(arr.length-1||1)*c.width,y=c.height-6-(v/mx)*(c.height-12);
+     i?g.lineTo(x,y):g.moveTo(x,y);});g.stroke();});
+}
+/* synchronized replay: shared playhead across trajectory canvas + sparklines */
+function startSyncReplay(metas,rowsEls,playBtn){
+ let playing=true,t0=performance.now(),prog=0;
+ const dur=Math.max(metas[0].duration_s,1)*1000;
+ const rowsEl=rowsEls&&rowsEls[0];
+ if(playBtn)playBtn.onclick=()=>{playing=!playing;
+   if(playing)t0=performance.now()-prog*dur;
+   playBtn.textContent=playing?'⏸ pause':'▶ play';};
+ const mainCv=panel.querySelector('.clip canvas');
+ function frame(now){
+   if(!rowsEl||!document.contains(rowsEl))return;   // panel replaced → stop
+   if(playing)prog=((now-t0)/dur)%1;
+   if(mainCv&&document.contains(mainCv))
+     drawReplayProgress(mainCv,metas[0].trajectory||[],prog,revealed?(COLORS[metas[0].label]||'#4fd1c5'):'#4fd1c5');
+   panel.querySelectorAll('canvas.spark').forEach(c=>{
+     const arr=c._arr||[0];const g=c.getContext('2d');
+     const mx=Math.max(...arr,1e-9);g.clearRect(0,0,c.width,c.height);
+     g.strokeStyle=c.dataset.c;g.lineWidth=2.5;g.beginPath();
+     arr.forEach((v,i)=>{const x=i/(arr.length-1||1)*c.width,y=c.height-6-(v/mx)*(c.height-12);
+       i?g.lineTo(x,y):g.moveTo(x,y);});g.stroke();
+     const px=prog*c.width;g.strokeStyle='#ffffff88';g.beginPath();g.moveTo(px,0);g.lineTo(px,c.height);g.stroke();});
+   requestAnimationFrame(frame);
+ }
+ requestAnimationFrame(frame);
+}
+function drawStaticReplay(c,traj,color){
+ const g=c.getContext('2d');g.clearRect(0,0,c.width,c.height);
+ if(!traj||traj.length<2){g.fillStyle='#31404f';g.font='20px system-ui';g.fillText('no path',20,40);return;}
+ drawReplayOn(c.getContext('2d'),c,traj,color,1);
+}
+function drawReplayOn(g,c,traj,color,prog){
+ let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+ traj.forEach(p=>{x0=Math.min(x0,p[0]);x1=Math.max(x1,p[0]);y0=Math.min(y0,p[1]);y1=Math.max(y1,p[1]);});
+ const P=p=>[16+(p[0]-x0)/(x1-x0+1e-9)*(c.width-32), c.height-16-(p[1]-y0)/(y1-y0+1e-9)*(c.height-32)];
+ const n=Math.max(2,Math.floor(traj.length*prog));
+ g.strokeStyle=color;g.lineWidth=3;g.beginPath();
+ for(let k=0;k<n;k++){const q=P(traj[k]);k?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1]);}
+ g.stroke();
+ const h=P(traj[Math.min(n,traj.length)-1]);
+ g.fillStyle='#fff';g.beginPath();g.arc(h[0],h[1],5,0,7);g.fill();
+}
+function drawReplayProgress(cvEl,traj,prog,color){
+ const g=cvEl.getContext('2d');g.fillStyle='#04070b';g.fillRect(0,0,cvEl.width,cvEl.height);
+ if(!traj||traj.length<2){g.fillStyle='#31404f';g.font='24px system-ui';
+   g.fillText('trajectory unavailable',24,60);return;}
+ drawReplayOn(g,cvEl,traj,color,prog);
+}
+window.closePanel=function(){panel.classList.remove('open');sel=-1;};
+window.showById=showById;
+
+/* ================= side-by-side synchronized comparison ================= */
+window.compare=async function(){
+ if(sel<0)return;
+ const e=EP[sel];const m=await fetchMeta(e.id);if(!m)return;
+ const nb=(m.neighbors||[])[0];if(!nb)return;
+ const m2=await fetchMeta(nb.episode_id);if(!m2)return;
+ const e2=IDX[nb.episode_id];
+ const nameOf=x=>revealed?`<span class="lbl" style="color:${COLORS[x.l]}">${NAMES[x.l]||x.l}</span>`
+                         :`<span class="lbl" style="color:#8fa8bc">movement</span>`;
+ panel.innerHTML=`
+  <div style="display:flex;align-items:center;gap:8px">
+    <button class="btn" style="padding:3px 10px" onclick="showById('${e.id}')">← back</button>
+    <span class="muted">side-by-side · each at its own real pace · shared playhead</span></div>
+  <div class="split" style="margin-top:10px">
+   <div>${nameOf(e)}<div class="muted">${e.d.toFixed(1)}s</div><img class="clip" id="cmpA"></div>
+   <div>${nameOf(e2)}<div class="muted">${e2.d.toFixed(1)}s</div><img class="clip" id="cmpB"></div>
+  </div>
+  <div class="muted">A vs B — similarity ${(nb.similarity).toFixed(2)} in feature space (d=${nb.dist.toFixed(2)}).
+   Watch the same playhead: where the speeds and paths agree, that is what “similar” means.</div>
+  <div id="cmpRowsA"></div><div id="cmpRowsB"></div>
+  <div style="display:flex;gap:8px;margin:8px 0"><button class="btn" id="cmpPlay" style="padding:4px 14px">⏸ pause</button></div>
+  <div class="prov">A: ${esc(m.provenance_chain.join('\n'))}\n---\nB: ${esc(m2.provenance_chain.join('\n'))}</div>`;
+ openPanel();
+ if(serverMode&&m.clip_kind==='video'){panel.querySelector('#cmpA').src=`clip/${e.id}.gif`;}
+ else{const img=panel.querySelector('#cmpA');img.onerror=()=>{};replayFallback(img,m,e);}
+ if(serverMode&&m2.clip_kind==='video'){panel.querySelector('#cmpB').src=`clip/${e2.id}.gif`;}
+ else{replayFallback(panel.querySelector('#cmpB'),m2,e2);}
+ // sparkline rows for both
+ for(const [mm,host] of [[m,'cmpRowsA'],[m2,'cmpRowsB']]){
+   document.getElementById(host).innerHTML=sparkRow('speed','#4fd1c5')+sparkRow('moving','#b794f4');
+   host&&document.getElementById(host).querySelectorAll('canvas.spark').forEach(c=>{
+     const arr=(mm.series||{})[c.dataset.lab]||[0];c._arr=arr;
+     const g=c.getContext('2d'),mx=Math.max(...arr,1e-9);
+     g.strokeStyle=c.dataset.c;g.lineWidth=2.5;g.beginPath();
+     arr.forEach((v,i)=>{const x=i/(arr.length-1||1)*c.width,y=c.height-6-(v/mx)*(c.height-12);
+       i?g.lineTo(x,y):g.moveTo(x,y);});g.stroke();});
+ }
+ // shared playhead over both canvases
+ const cA=document.createElement('canvas'),cB=document.createElement('canvas');
+ [cA,cB].forEach(c=>{c.width=360;c.height=200;c.style.width='100%';c.style.background='#04070b';c.style.borderRadius='8px';});
+ document.getElementById('cmpRowsA').prepend(cA);
+ document.getElementById('cmpRowsB').prepend(cB);
+ let playing=true,t0=performance.now(),pauseProg=0;
+ const dur=Math.max(Math.min(m.duration_s,m2.duration_s),1)*1000;
+ document.getElementById('cmpPlay').onclick=()=>{playing=!playing;
+   if(playing)t0=performance.now()-pauseProg*dur;else pauseProg=0;};
+ (function loop(now){
+   if(!document.getElementById('cmpRowsA'))return;
+   if(playing)pauseProg=((now-t0)/dur)%1;
+   const prog=pauseProg;
+   drawReplayProgress(cA,m.trajectory||[],prog,'#4fd1c5');
+   drawReplayProgress(cB,m2.trajectory||[],prog,'#e8a13c');
+   document.querySelectorAll('#cmpRowsA canvas.spark, #cmpRowsB canvas.spark').forEach(c=>{
+     if(!c._base){c._base=document.createElement('canvas');c._base.width=c.width;c._base.height=c.height;
+       c._base.getContext('2d').drawImage(c,0,0);}
+     const g=c.getContext('2d');
+     g.clearRect(0,0,c.width,c.height);g.drawImage(c._base,0,0);
+     g.strokeStyle='#ffffff88';g.lineWidth=2;g.beginPath();
+     g.moveTo(prog*c.width,0);g.lineTo(prog*c.width,c.height);g.stroke();});
+   requestAnimationFrame(loop);
+ })(performance.now());
 };
 
-/* ---------- Motion Dictionary ---------- */
-function showMotif(m){
- if(m<0)return;
- const reps=EP.filter(e=>e.motif===m);
- const comp={};reps.forEach(e=>comp[e.bio_label]=(comp[e.bio_label]||0)+1);
- const occ=Object.entries(comp).sort((a,b)=>b[1]-a[1]);
- document.getElementById('detail').innerHTML=`
-  <div style="color:#9fe8df;font-size:15px">Motion M${m}</div>
-  <div class="muted">机器发现的运动模式——先看代表片段，再命名它。</div>
-  <div style="margin:8px 0">${occ.map(([k,v])=>`
-    <div style="display:flex;align-items:center;gap:8px;margin:3px 0">
-      <span class="lbl" style="color:${COLORS[k]};min-width:110px">${NAMES[k]||k}</span>
-      <span class="bar" style="width:${(v/reps.length*180)|0}px;background:${COLORS[k]}"></span>
-      <span class="muted">${(v/reps.length*100).toFixed(1)}% · ${v} 段</span></div>`).join('')}
-  </div>
-  <div class="muted">全部 ${EP.length} 段中此 motif 有 ${reps.length} 段（${(reps.length/EP.length*100).toFixed(1)}%）</div>
-  ${reps.slice(0,6).map(e=>`<div class="nbr" onclick="showById('${e.episode_id}')">
-    <img src="${e.clip}"><div><span class="lbl" style="color:${COLORS[e.bio_label]}">${NAMES[e.bio_label]||e.bio_label}</span>
-    <div class="muted">${e.duration_s.toFixed(1)}s</div></div></div>`).join('')}`;
+/* ================= region ================= */
+function showRegion(near){
+ const ids=near.slice(0,50).map(x=>x[1]);
+ const lab={};ids.forEach(i=>{const e=EP[i];lab[e.l]=(lab[e.l]||0)+1;});
+ sel=-1;
+ const rep=ids.slice(0,6);
+ panel.innerHTML=`
+  <div style="display:flex;align-items:center;gap:8px"><span style="color:var(--accent)">Region · ${ids.length} movements</span>
+   <span class="sp" style="flex:1"></span><button class="btn" style="padding:3px 10px" onclick="closePanel()">esc</button></div>
+  <div class="muted">You clicked a neighborhood of movement space — these episodes live here because their
+   kinematics agree, ${revealed?'regardless of who they belong to:':'whatever they are.'}</div>
+  ${revealed?`<div style="margin:8px 0">${Object.entries(lab).sort((a,b)=>b[1]-a[1]).map(([l,c])=>
+     `<span class="lbl" style="color:${COLORS[l]};margin-right:6px">${NAMES[l]||l} ${c}</span>`).join('')}</div>`
+   :`<div class="muted" style="margin:8px 0">Reveal species to see who lives here.</div>`}
+  <div id="replist"></div>`;
+ openPanel();
+ const host=panel.querySelector('#replist');
+ rep.forEach(async (i,k)=>{
+   const e=EP[i],m=await fetchMeta(e.id);if(!m)return;
+   const d=document.createElement('div');d.className='nbr';
+   d.innerHTML=`<canvas width="192" height="120"></canvas>
+     <div>${labelChip(e)}<div class="muted">${e.d.toFixed(1)}s · M${e.m} · ${(e.cv||0).toFixed(2)} cv</div></div>`;
+   d.onclick=()=>select(i);host.appendChild(d);
+   drawStaticReplay(d.querySelector('canvas'),m.trajectory||[],revealed?(COLORS[e.l]||'#4fd1c5'):'#56677a');
+ });
 }
 
-/* ---------- Behavior River ---------- */
-document.getElementById('riverBtn').onclick=()=>{
- const w=document.getElementById('riverWrap');
- if(w.style.display==='none'){w.style.display='block';drawRiver(w);}else{w.style.display='none';w.innerHTML='';}
+/* ================= explore drawer ================= */
+document.getElementById('exploreBtn').onclick=()=>{showExplore('dictionary');};
+function tab(name,active){
+ return `<span class="chip ${active?'on':''}" onclick="showExplore('${name}')">${
+   {dictionary:'☰ Motion Dictionary',fingerprint:'⌇ Mimicry fingerprint',river:'≈ Behavior River',data:'⌸ Data & provenance'}[name]}</span>`;}
+window.showExplore=function(tabName){
+ openPanel();
+ renderExplore(tabName);
 };
-function drawRiver(w){
- const hasH=EP.filter(e=>e.hour!=null);
- const useH=hasH.length>EP.length/2;
- const bins=24, keys=[...new Set(EP.map(e=>e.bio_label))];
+function openPanel(){panel.classList.add('open');}
+function renderExplore(tabName){
+ if(tabName==='dictionary')return renderDictionary();
+ if(tabName==='fingerprint')return renderFingerprint();
+ if(tabName==='river')return renderRiver();
+ if(tabName==='data')return renderData();
+}
+function renderDictionary(){
+ const counts={};EP.forEach(e=>counts[e.m]=(counts[e.m]||0)+1);
+ const motifs=Object.keys(counts).map(Number).sort((a,b)=>a-b);
+ const ann=(META.motif_annotations||{});
+ const sel_m=motifSel>=0?motifSel:motifs[0];
+ const reps=EP.filter(e=>e.m===sel_m);
+ const lab={};reps.forEach(e=>lab[e.l]=(lab[e.l]||0)+1);
+ const humanAnn=ann[String(sel_m)];
+ panel.innerHTML=`
+  <h1>Motion Dictionary</h1>
+  <div class="muted">Motifs are discovered by the machine (k-means in feature space).
+   They have numbers, not names — naming is a human act, after watching.</div>
+  <div class="tabbar">${tab('dictionary',1)}${tab('fingerprint',0)}${tab('river',0)}${tab('data',0)}</div>
+  <div style="margin:6px 0">${motifs.map(m=>`<span class="chip ${m===sel_m?'on':''}" onclick="motifClick(${m})">M${m} · ${counts[m]}</span>`).join('')}</div>
+  <div style="margin:10px 0 4px;color:var(--accent);font-size:15px">M${sel_m} ${humanAnn?`— “${esc(humanAnn.name)}” <span class="muted">(${esc(humanAnn.annotator)})</span>`:''}</div>
+  <div style="display:flex;gap:6px;margin:8px 0">
+   <input class="txt" id="motifName" placeholder="name this movement after watching…" value="${humanAnn?esc(humanAnn.name):''}">
+   <button class="btn" id="motifSave" style="padding:4px 12px">save</button></div>
+  <textarea class="txt" id="motifNotes" rows="2" placeholder="notes (optional)">${humanAnn?esc(humanAnn.notes||''):''}</textarea>
+  <div class="muted" style="margin-top:6px">${reps.length} of ${EP.length} movements (${(reps.length/EP.length*100).toFixed(1)}%)
+   ${revealed?`— occupancy: ${Object.entries(lab).sort((a,b)=>b[1]-a[1]).map(([l,c])=>`${NAMES[l]||l} ${(c/reps.length*100).toFixed(0)}%`).join(' · ')}`
+             :'— <b>Reveal species</b> to see which animals do this.'}</div>
+  ${revealed?Object.entries(lab).sort((a,b)=>b[1]-a[1]).map(([l,c])=>`
+    <div class="fprow"><span class="name" style="color:${COLORS[l]}">${NAMES[l]||l}</span>
+      <span class="track"><span class="fill" style="width:${(c/reps.length*100)|0}%;background:${COLORS[l]}"></span></span>
+      <span class="muted">${(c/reps.length*100).toFixed(1)}%</span></div>`).join(''):''}
+  <div id="replist" style="margin-top:8px"></div>`;
+ const host=panel.querySelector('#replist');
+ reps.slice(0,6).forEach(async e=>{
+   const m=await fetchMeta(e.id);if(!m)return;
+   const d=document.createElement('div');d.className='nbr';
+   d.innerHTML=`<canvas width="192" height="120"></canvas><div>${labelChip(e)}<div class="muted">${e.d.toFixed(1)}s · ${(e.cv||0).toFixed(2)} cv</div></div>`;
+   d.onclick=()=>select(EP.indexOf(e));host.appendChild(d);
+   drawStaticReplay(d.querySelector('canvas'),m.trajectory||[],revealed?(COLORS[e.l]||'#4fd1c5'):'#56677a');
+ });
+ panel.querySelector('#motifSave').onclick=()=>{
+   const name=panel.querySelector('#motifName').value.trim();
+   const notes=panel.querySelector('#motifNotes').value.trim();
+   const annotator=(localStorage.getItem('annotator')||'anonymous');
+   if(serverMode){fetch('api/motifs',{method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({motif:sel_m,name,notes,annotator})}).then(r=>r.json()).then(o=>{
+       if(o.saved){META.motif_annotations=META.motif_annotations||{};META.motif_annotations[String(sel_m)]=o.saved;
+         toast('saved ✓');renderDictionary();}});
+   }else{META.motif_annotations=META.motif_annotations||{};
+     META.motif_annotations[String(sel_m)]={name,notes,annotator,timestamp:new Date().toISOString(),local:true};
+     toast('saved locally — run motionscape serve to persist');renderDictionary();}
+ };
+}
+window.motifClick=function(m){motifSel=(motifSel===m)?-1:m;renderDictionary();};
+const FP_DIM_NAMES={speed_dynamics:"Speed dynamics",speed_intermittency:"Intermittency",
+ stop_go_rhythm:"Stop–go rhythm",turning:"Turning dynamics",path_shape:"Trajectory geometry",
+ trajectory_space:"Trajectory space"};
+const FP_FUTURE=["Pose (foreleg-I ↔ antennae)","Leg-I dynamics","Motif occupancy","Behavioral grammar"];
+function renderFingerprint(){
+ const fp=(META.fingerprint&&META.fingerprint.fingerprint)||{};
+ const prov=(META.fingerprint&&META.fingerprint.provenance)||{};
+ panel.innerHTML=`
+  <h1>Behavioral Mimicry Fingerprint</h1>
+  <div class="muted">Per-dimension overlap (Bhattacharyya coefficient, 0–1) between Siler and ant
+   episode distributions. <b style="color:#8fa8bc">Deliberately not one number</b> — mimicry is a profile, not a score.</div>
+  <div class="tabbar">${tab('dictionary',0)}${tab('fingerprint',1)}${tab('river',0)}${tab('data',0)}</div>
+  ${!revealed?`<div class="muted" style="margin:10px 0">This panel describes specific animals — press <b>Reveal species</b> first.</div>`:
+  Object.entries(fp).length?Object.entries(fp).map(([d,v])=>`
+    <div class="fprow"><span class="name">${FP_DIM_NAMES[d]||d}</span>
+      <span class="track"><span class="fill" style="width:${(v*100)|0}%"></span></span>
+      <span class="muted">${(+v).toFixed(2)}</span></div>`).join('')
+   :'<div class="muted">Not enough reviewed episodes on both sides yet.</div>'}
+  ${revealed?`<div class="muted" style="margin:10px 0">Not yet computed (next phases):</div>
+    ${FP_FUTURE.map(f=>`<div class="fprow future"><span class="name">${f}</span>
+      <span class="track"><span class="fill" style="width:0%"></span></span>
+      <span class="muted">—</span></div>`).join('')}`:''}
+  <div class="prov">n_siler=${prov.parameters?.n_siler??'—'} n_ant=${prov.parameters?.n_ant??'—'}
+ model=${prov.model_name||'—'} @ ${prov.timestamp||'—'}</div>
+  <div class="muted" style="margin-top:8px">2-D projection ≠ statistical evidence. Overlaps here summarize the
+   same features the space was built from; formal tests belong in the analysis notebooks.</div>`;
+}
+function renderRiver(){
+ panel.innerHTML=`
+  <h1>Behavior River</h1>
+  <div class="tabbar">${tab('dictionary',0)}${tab('fingerprint',0)}${tab('river',1)}${tab('data',0)}</div>
+  ${!revealed?'<div class="muted" style="margin:10px 0">The river flows in species colors — press <b>Reveal species</b> first.</div>':''}
+  <canvas id="river" width="760" height="240" style="width:100%;background:#0c141c;border-radius:8px"></canvas>
+  <div class="muted">Species movement volume across the day (hour of day when timestamps exist).
+   Rhythmic differences between groups are themselves testable questions.</div>`;
+ if(revealed)drawRiver();
+}
+function drawRiver(){
+ const withH=EP.filter(e=>e.hour!=null);
+ const useH=withH.length>EP.length/2;
+ const bins=24,keys=[...new Set(EP.map(e=>e.l))];
  const grid=Object.fromEntries(keys.map(k=>[k,new Array(bins).fill(0)]));
- EP.forEach((e,i)=>{
-   const b=useH?Math.min(bins-1,Math.max(0,Math.floor(e.hour||0)))
-              :Math.min(bins-1,Math.floor(i/EP.length*bins));
-   grid[e.bio_label][b]++;});
- const c=document.createElement('canvas');c.id='river';c.width=820;c.height=240;c.style.height='120px';
- w.appendChild(c);
- const g=c.getContext('2d');
+ EP.forEach((e,i)=>{const b=useH?Math.min(bins-1,Math.max(0,Math.floor(e.hour||0)))
+   :Math.min(bins-1,Math.floor(i/EP.length*bins));grid[e.l][b]++;});
+ const c=document.getElementById('river'),g=c.getContext('2d');
  const mx=Math.max(...keys.flatMap(k=>grid[k]),1);
- const rowH=(c.height-34)/keys.length;
- keys.forEach((k,ki)=>{
-   g.fillStyle=COLORS[k]||COLORS.unknown;g.globalAlpha=.85;
-   grid[k].forEach((v,b)=>{
-     const h=Math.max(v/mx,0.0)*rowH;
-     if(v>0)g.fillRect(b*(c.width/bins)+2, c.height-26-ki*rowH-rowH, c.width/bins-4, Math.max(h,2));
-   });});
+ const rowH=(c.height-40)/keys.length;
+ keys.forEach((k,ki)=>{g.fillStyle=COLORS[k]||COLORS.unknown;g.globalAlpha=.85;
+   grid[k].forEach((v,b)=>{if(v>0)g.fillRect(b*(c.width/bins)+2,c.height-30-ki*rowH-rowH,
+     c.width/bins-4,Math.max(v/mx*rowH,2));});});
  g.globalAlpha=1;g.fillStyle='#54687c';g.font='15px system-ui';g.textAlign='center';
- for(let b=0;b<bins;b+=3)g.fillText(useH?`${b}:00`:`#${b}`,b*(c.width/bins)+(c.width/bins)/2,c.height-8);
+ for(let b=0;b<bins;b+=4)g.fillText(useH?`${b}:00`:`#${b}`,b*(c.width/bins)+(c.width/bins)/2,c.height-8);
  keys.slice().reverse().forEach((k,ki)=>{g.fillStyle=COLORS[k];g.textAlign='left';
-   g.fillText((NAMES[k]||k).split(' ')[0],8,16+ki*16);});
- w.insertAdjacentHTML('beforeend',
-  '<div class="muted">Behavior River — 各物种运动量沿'+(useH?'一天时刻':'录制顺序')+'的流动。ant / mimic / other 的节律差异本身即科学问题。</div>');
+   g.fillText((NAMES[k]||k).split(' ')[0],8,20+ki*16);});
 }
+function renderData(){
+ const h=META.hierarchy,tree=h.tree||{};
+ panel.innerHTML=`
+  <h1>Data & provenance</h1>
+  <div class="tabbar">${tab('dictionary',0)}${tab('fingerprint',0)}${tab('river',0)}${tab('data',1)}</div>
+  <div class="muted">Sampling hierarchy — episodes are <b>not</b> independent replicates. Statistics must
+   respect site → session → video → episode (hierarchical bootstrap / mixed models).</div>
+  <div style="margin:8px 0;font-size:12px">
+   ${h.n_episodes} episodes · ${h.n_videos} videos · ${h.n_sessions} sessions · ${h.n_sites} site(s)</div>
+  <div class="prov">${Object.entries(tree).map(([s,sess])=>
+    `${s}\n`+Object.entries(sess).map(([ss,vids])=>
+      `  ${ss}\n`+Object.entries(vids).map(([v,n])=>`    ${v} — ${n} eps`).join('\n')).join('\n')).join('\n')}</div>
+  <div class="muted" style="margin-top:10px">Behavioral space</div>
+  <div class="prov">${esc(META.embedding.model)} · blind to biological labels: ${META.embedding.blind_to_labels}
+\n${esc(META.embedding.note)}</div>
+  <div class="muted" style="margin-top:10px">Run provenance</div>
+  <div class="prov">${esc(JSON.stringify(META.provenance,null,1).slice(0,900))}</div>
+  <div class="muted" style="margin-top:10px">Atlas build</div>
+  <div class="prov">MOTIONSCAPE v${META.motionscape_version} · built ${META.generated_utc} in ${META.build_seconds}s
+\nserver media: ${serverMode?'on (clips generated on demand)':'off — run: python -m motionscape serve'}</div>`;
+}
+function toast(t){const e=document.createElement('div');e.textContent=t;
+ e.style.cssText='position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#14303a;color:#c8f2ec;padding:6px 16px;border-radius:16px;font-size:13px;z-index:30;transition:opacity .4s';
+ document.body.appendChild(e);setTimeout(()=>e.style.opacity=0,1400);setTimeout(()=>e.remove(),1900);}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
-document.getElementById('revealBtn').onclick=function(){
- revealTarget=revealTarget?0:1;
- this.textContent=revealTarget?'◌ Hide species':'✦ Reveal species';
- this.style.background=revealTarget?'#14303a':'#0e1a22';
-};
+/* ================= Reveal species ================= */
+const revealBtn=document.getElementById('revealBtn');
+function toggleReveal(){
+ revealed=!revealed;
+ revealBtn.textContent=revealed?'◌ Hide species':'✦ Reveal species';
+ const lg=document.getElementById('legend');
+ if(revealed){
+   lg.style.display='flex';
+   lg.innerHTML='<div class="muted" style="max-width:300px;margin-bottom:4px">The space was built without knowing '+
+     'what any animal is — only how it moves. Only now are names laid over it.</div>'+
+     Object.entries(COLORS).filter(([k])=>k!=='mimic'||META.labels_summary.mimic)
+       .filter(([k])=>(META.labels_summary[k]||0)>0)
+       .map(([k,c])=>`<div><span class="dot" style="background:${c}"></span>${NAMES[k]||k} · ${(META.labels_summary[k]||0)}</div>`).join('');
+ }else lg.style.display='none';
+}
+revealBtn.onclick=toggleReveal;
 </script>
 </body>
 </html>"""

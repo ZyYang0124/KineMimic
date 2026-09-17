@@ -21,6 +21,15 @@ from typing import Any, Optional
 # observations.
 BIO_LABELS = ("siler", "ant", "other_spider", "other_arthropod", "unknown")
 
+# QC / annotation-review states. Reviewing never deletes or alters the
+# observation; it only sets this state (append-only annotation log).
+QC_STATES = ("unreviewed", "accepted", "rejected", "tracking_failure",
+             "severe_occlusion", "edge_effect", "too_short", "ambiguous_taxon")
+
+# Sampling hierarchy: statistics must respect site > session > video > episode
+# (episodes from one video are not independent replicates).
+SITE_LEVELS = ("site", "session", "video", "episode")
+
 
 def _now_iso() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
@@ -101,7 +110,28 @@ class Episode:
     qc: TrajectoryQC = field(default_factory=TrajectoryQC)
     environment: Environment = field(default_factory=Environment)
 
-    # biological annotation (separate from observation; refinable)
+    # sampling hierarchy (episode != independent biological replicate)
+    site_id: Optional[str] = None
+    session_id: Optional[str] = None
+
+    # ---- MACHINE prediction (may participate in circularity; never ground truth)
+    machine_label: Optional[str] = None
+    machine_confidence: float = 0.0
+    machine_source: Optional[str] = None      # e.g. "model:heuristic-v1"
+
+    # ---- HUMAN annotation (independent of movement features; the only
+    # ---- admissible ground truth for mimicry comparisons)
+    human_label: Optional[str] = None
+    human_confidence: float = 0.0
+    human_source: Optional[str] = None        # "human" | "dataset:<name>"
+    annotator: Optional[str] = None
+    annotation_timestamp: Optional[str] = None
+    annotation_status: str = "unreviewed"     # one of QC_STATES
+    annotation_note: str = ""
+
+    # legacy combined field (v0.1): kept in sync as the *effective* label so
+    # older consumers (viz.py, old runs) keep working. New code should use
+    # effective_label().
     bio_label: str = "unknown"
     bio_label_confidence: float = 0.0
     bio_label_source: str = "unannotated"  # unannotated | model:<name> | human
@@ -122,6 +152,18 @@ class Episode:
     @property
     def duration_s(self) -> float:
         return (self.end_frame - self.start_frame) / self.fps if self.fps else 0.0
+
+    def effective_label(self) -> str:
+        """The label analysis overlays may use: human annotation if present,
+        else machine prediction. Embeddings never use either."""
+        if self.human_label:
+            return self.human_label
+        if self.machine_label:
+            return self.machine_label
+        return self.bio_label or "unknown"
+
+    def is_reviewed(self) -> bool:
+        return self.annotation_status != "unreviewed"
 
     def provenance_chain(self) -> list[str]:
         """Human-readable trace from embedding back to video frames."""
@@ -148,4 +190,17 @@ class Episode:
         d.pop("duration_s", None)
         qc = TrajectoryQC(**d.pop("qc")) if d.get("qc") else TrajectoryQC()
         env = Environment(**d.pop("environment")) if d.get("environment") else Environment()
+        # migrate v0.1 runs: combined bio_label -> separated machine/human fields
+        if d.get("machine_label") is None and d.get("human_label") is None:
+            src = d.get("bio_label_source") or "unannotated"
+            if src.startswith("human") or src.startswith("dataset"):
+                d["human_label"] = d.get("bio_label")
+                d["human_confidence"] = d.get("bio_label_confidence", 0.0)
+                d["human_source"] = src
+                d["annotator"] = src
+                d["annotation_status"] = "accepted"
+            elif src.startswith("model:"):
+                d["machine_label"] = d.get("bio_label")
+                d["machine_confidence"] = d.get("bio_label_confidence", 0.0)
+                d["machine_source"] = src
         return cls(qc=qc, environment=env, **d)

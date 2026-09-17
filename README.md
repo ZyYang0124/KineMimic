@@ -1,115 +1,121 @@
-# MOTIONSCAPE — The Atlas of Animal Movement
+# MOTIONSCAPE — An atlas of animal movement
 
-最终产品不是行为分析软件，而是一张**可以探索的动物运动图谱**；
-行为分析算法负责让这张图谱科学可信。第一生物系统是拟蚁跳蛛
-*Siler* 与同域蚂蚁，但图谱本身与物种无关，可扩展到任何动物运动。
-
-**Computational ethology for ant-mimicking jumping spiders.**
-How does a *Siler* jumping spider move like an ant? MOTIONSCAPE turns naturalistic
-video into a quantitative, explorable movement space — a **movement
-murmuration** where every particle is one real movement episode.
+MOTIONSCAPE is an **explorable atlas of animal movement**: real movement
+episodes, computationally characterized, organized into a space you walk
+into and explore — the way bird-call projects let people explore the
+structure of sound. Behavioral analysis exists to keep the atlas
+scientifically honest.
 
 ```
-Video → Detection → Movement Episodes → Trajectory → Kinematics
-      → Features + Motifs → BEHAVIOR SPACE → Siler↔Ant comparison
-                                              → Behavioral mimicry
+MOTIONSCAPE
+└── The Murmur          — the explorable movement space (the atlas itself)
+    └── Ant Mimicry     — first biological showcase:
+                          How does a spider move like an ant?
 ```
+
+Future showcases (courtship, predation, any taxon) use the same
+architecture — no species concepts are baked into the pipeline.
 
 ## Quick start
 
 ```bash
 pip install -e .          # or just run from the repo root
-python -m motionscape demo     # synthetic end-to-end tour (~2 min)
+python -m motionscape demo        # synthetic end-to-end tour (~2 min)
+python -m motionscape serve <run>/atlas   # open the atlas
 ```
 
 The demo renders four synthetic field videos (ants: smooth persistent
 walking; Siler: intermittent stop-and-go with jumps), runs the full
-pipeline, and writes a run directory containing `episodes.jsonl`,
-`summary.json` (including a first **mimicry fingerprint**), and
-`atlas/index.html` — **The Atlas**: serve it (`python -m http.server`
-inside the atlas dir) and open in a browser.
+pipeline, and writes a run directory with `episodes.jsonl`,
+`summary.json`, and `atlas/` — **The Murmur**.
 
-### The Movement Galaxy experience
+### Inside the atlas
 
-- **Hero intro** — a real trajectory grows on a dark field under the question
-  *"How does a spider move like an ant?"*; one click dissolves into the galaxy.
-- **Explore the flock** — the landing view is a living murmuration.
-  Particles are positioned by behavioral similarity only (species colors
-  hidden); each particle drifts along its episode's *real* sliding-window
-  embedding path z₁…z_t, so flock motion is data, not decoration.
-  Press **Reveal species** and the flock colors in over ~2 s — the moment
-  you discover which regions are ants, which are Siler.
-- **Explore a movement** — click any particle: the original video clip
-  plays, with live trajectory trace, speed sparkline, pause statistics,
-  playing alongside, with **speed / turn / moving** time-series rows, and
-  **Compare with nearest ant** for a split-screen side-by-side. Every clip is
-  either the true source video (where available) or a trajectory replay whose
-  motion is the real path — never decoration.
-- **Explore a motif (Motion Dictionary)** — select a discovered motif; the
-  rest of the galaxy fades and the panel shows species-occurrence bars plus
-  representative clips. Machine discovers behaviors; humans name them after
-  watching (e.g. M2: 65.6% ant, 28.1% non-mimic, 6.3% mimic).
-- **Behavior River** — species movement volume flowing across the day
-  (hour-of-day when timestamps exist): rhythmic differences between ants,
-  mimics and non-mimics become visible science questions.
+- You land **blind**: the movement space shows structure, not species —
+  every particle is one real episode, positioned by behavioral similarity,
+  drifting along its own real sliding-window path through the space,
+  quivering with its movement intermittency.
+- **Click any particle**: the real episode plays (source video when
+  reachable; otherwise a faithful replay), with real speed / turn / moving
+  time series, trajectory, and provenance back to video and frames.
+- **Similar movements** are nearest neighbors in the original 17-D feature
+  space — never screen distance. `⇄ compare` plays selected vs. neighbor
+  side-by-side with a shared playhead: see *why* they are similar.
+- **Reveal species** (`R`) is the signature moment: only now do Siler /
+  Ant / Other identities fade in over the structure you've been exploring.
+- **Motion Dictionary**: machine-discovered motifs with numbers, not
+  names — watch the representative episodes, then name them (persisted).
+- **Mimicry fingerprint**: per-dimension Siler↔ant overlap, deliberately
+  never collapsed into one number.
+- **Behavior River** and the sampling-hierarchy tree live in the Explore
+  drawer; every statistic respects Site → Session → Video → Episode.
+
+Full tour: **`docs/ATLAS.md`** · what each channel encodes, and every
+scientific assumption behind the interface:
+**`docs/SCIENTIFIC_ASSUMPTIONS.md`**.
 
 ## Commands
 
 ```bash
-python -m motionscape ingest VIDEO.mp4 --id siteA_clip01 --store murmur_runs
-python -m motionscape viz murmur_runs/runs/<run_id>/episodes.jsonl --out murmuration.html
+python -m motionscape ingest VIDEO.mp4 --id siteA_01 --site siteA
+python -m motionscape annotate <run>/episodes.jsonl   # human QC + labels
+python -m motionscape atlas <run>/episodes.jsonl --out <run>/atlas_v2
+python -m motionscape serve <run>/atlas_v2 --episodes <run>/episodes.jsonl
+python -m motionscape benchmark --n 5000 10000        # scale checks
 ```
+
+## Your own videos
+
+Film spiders and ants together, then `ingest` → `annotate` → `serve`
+(filming tips: **`docs/UPLOAD.md`**). Validated end-to-end on real field
+footage (83 episodes from 57 s of 120 fps GoPro video). Annotation is the
+line between a demo and a result: machine pre-labels share features with
+the movement analysis and can never serve as ground truth — the workbench
+(`docs/ANNOTATION.md`) makes human review fast enough to actually do.
 
 ## Design principles
 
 1. **The episode, not the individual, is the unit.** A movement episode is
-   one continuous reliable observation (~3–30 s). Reappearing animals simply
-   create new episodes; long-term identity is deliberately out of scope.
-2. **Every point links back to life.** Episodes store video id, frame range,
-   raw trajectory, features, and a full processing-history chain. Clicking a
-   particle in the visualization shows this provenance and replays the real
-   trajectory.
-3. **Observation ≠ annotation.** Biological labels (Siler / ant / other
-   spider / other arthropod / unknown) are model-or-human annotations stored
-   separately and refinable (e.g. ant → *Crematogaster*) without reprocessing.
-4. **Never overwrite science.** Every analysis is an append-only run with a
-   manifest (software version, model, parameters, timestamp, parent run).
-5. **Two discovery routes.** Interpretable kinematics (speed, turning,
-   stop–go rhythm, sinuosity) *and* unsupervised structure (PCA behavioral
-   space, k-means motifs). Mimicry is measured per dimension
-   (Bhattacharyya overlap) toward a Behavioral Mimicry Fingerprint.
-6. **Visual motion is data.** In the atlas: position = embedding path
-   (windowed, real drift through behavioral space), color = label,
-   flutter amplitude = movement intermittency (speed CV), clips = the
-   actual source-video frames.
+   one continuous reliable observation (~3–30 s); reappearance creates a
+   new episode; long-term identity is deliberately out of scope.
+2. **Every point links back to life.** Episodes store video id, frame
+   range, raw trajectory, features, and a full processing-history chain.
+3. **Observation ≠ annotation.** Machine predictions and human labels live
+   in separate fields; effective label = human ⊕ machine (human wins);
+   biological labels never influence the behavioral space (blind
+   embedding, enforced by test).
+4. **Never overwrite science.** Append-only runs, append-only annotation
+   log, versioned atlas directories, full provenance.
+5. **Two discovery routes.** Interpretable kinematics and unsupervised
+   structure (PCA space, k-means motifs); mimicry measured per dimension.
+6. **Visual motion is data.** Position = embedding, drift = the episode's
+   real path through the space, flutter = intermittency; episodes without
+   windowable data sit still. Decorative animation is prohibited and the
+   few UI transitions respect `prefers-reduced-motion`.
+7. **Episodes ≠ replicates.** The sampling hierarchy is stored and
+   statistics must respect it.
 
-## Status (V1)
+## Status (V0.2)
 
-- Detection: background-differencing detector for small dark arthropods
-  (swappable; model name/version recorded per run)
-- Short-term greedy tracker; episodes with QC
-- 17 kinematic features incl. move–pause rhythm
-- Heuristic transparent classifier (body elongation × intermittency)
-- PCA behavioral space, k-means motifs, mimicry fingerprint
-- Self-contained HTML murmuration visualization
+- Detection (swappable bg-diff), short-term greedy tracker, episode QC
+- 16 kinematic features; transparent machine pre-classifier (separate
+  from ground truth)
+- **Annotation workbench** — keyboard-first human review, per-keystroke
+  persistence, QC states, machine/human separation
+- Blind PCA behavioral space, k-means motifs, per-dimension mimicry
+  fingerprint
+- **The Murmur** — blind-first atlas: staged intro, Reveal species,
+  feature-space nearest neighbors, synchronized side-by-side comparison,
+  region exploration, Motion Dictionary with human naming, Behavior
+  River, hierarchy & provenance panels
+- Scale: canvas rendering + lazy media + exact k-d-tree neighbors;
+  benchmarked to 20,000 episodes per build (~0.3 KB/episode payload);
+  target ≥5,000 QC-approved real episodes next
+- Real data: Shamble 2017 (228 episodes, gold labels), Zeng 2023 (64
+  velocity/pose episodes incl. non-mimetic control), own field video
 
 ## Roadmap
 
-Pose (esp. Siler foreleg-I vs ant antennae), behavioral grammar
-(motif transition sequences), non-mimetic jumping spider controls,
-video-clip playback on episode click, real field data ingest.
-
-## Your own videos
-
-Film spiders and ants together, then:
-
-```bash
-python -m motionscape ingest myvideo.mp4 --id siteA_01
-```
-
-Detection → episodes → galaxy → mimicry comparison, fully automatic.
-Filming tips, tuning and annotation refinement: **`docs/UPLOAD.md`**.
-Validated end-to-end on real field footage (83 episodes from 57 s of
-120 fps GoPro video).
-
-See `docs/DESIGN.md` for the full data model and provenance contract.
+Pose (foreleg-I vs antennae), behavioral grammar (motif transition
+sequences), more sites/sessions of field footage toward the 5,000-episode
+goal, UMAP as an alternative (still-blind) space.

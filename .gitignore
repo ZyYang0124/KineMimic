@@ -1,4 +1,6 @@
 murmur_runs/
+motionscape_runs/
+benchmarks/atlas_*/
 _t*.avi
 _t*.js
 _mask.png

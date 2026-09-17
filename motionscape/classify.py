@@ -30,7 +30,8 @@ def classify_episode(ep: Episode) -> tuple[str, float]:
     w = np.median([b[0] for b in ep.bbox_sizes_px]) if ep.bbox_sizes_px else 0
     h = np.median([b[1] for b in ep.bbox_sizes_px]) if ep.bbox_sizes_px else 0
     aspect = w / max(h, 1e-9)
-    f = trajectory_features(ep.centroids_px, ep.fps, ep.px_per_cm, ep.frames)
+    f = ep.trajectory_features or trajectory_features(
+        ep.centroids_px, ep.fps, ep.px_per_cm, ep.frames)
     intermittent = f["speed_cv"] + f["n_pauses"] / max(f["duration_s"], 1e-9)
     elongate = np.log(max(aspect, 1e-9))
     score = elongate - 0.35 * intermittent  # ants high, siler low
@@ -42,13 +43,21 @@ def classify_episode(ep: Episode) -> tuple[str, float]:
 
 
 def label_episodes(episodes: list[Episode]) -> list[Episode]:
+    """Machine pre-classification. Writes ONLY the machine_* fields (plus the
+    legacy bio_label mirror); never overwrites a human annotation. These
+    labels are predictions, not ground truth: they share features with the
+    movement analysis and must stay separable from human annotation."""
     for ep in episodes:
         label, conf = classify_episode(ep)
-        ep.bio_label, ep.bio_label_confidence = label, conf
-        ep.bio_label_source = f"model:{MODEL_NAME}"
+        ep.machine_label, ep.machine_confidence = label, conf
+        ep.machine_source = f"model:{MODEL_NAME}"
+        if not ep.human_label:      # human annotation always wins
+            ep.bio_label, ep.bio_label_confidence = label, conf
+            ep.bio_label_source = f"model:{MODEL_NAME}"
         ep.processing_history.append(Provenance(
             software_version=__version__, model_name=MODEL_NAME, model_version="1",
-            parameters=dict(aspect_note="median bbox w/h, intermittency=speed_cv+pauses/s"),
+            parameters=dict(aspect_note="median bbox w/h, intermittency=speed_cv+pauses/s",
+                            scope="machine_label_only"),
             parent_ids=[ep.episode_id]).to_dict())
     return episodes
 

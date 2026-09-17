@@ -1,0 +1,10 @@
+{
+  "n_episodes": 1000,
+  "gen_s": 0.42,
+  "features_s": 0.0,
+  "nearest_neighbors_s": 3.747,
+  "atlas_build_s": 6.96,
+  "data_json_mb": 0.32,
+  "meta_files": 1000,
+  "kb_per_episode": 0.31
+}
