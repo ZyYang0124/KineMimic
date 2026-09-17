@@ -4,3 +4,4 @@ _t*.js
 _mask.png
 __pycache__/
 *.pyc
+data/external/
