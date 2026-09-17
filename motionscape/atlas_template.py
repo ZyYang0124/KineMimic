@@ -89,6 +89,19 @@ TEMPLATE = r"""<!DOCTYPE html>
  table.cmp{border-collapse:collapse;font-size:12px;width:100%;margin:6px 0}
  table.cmp td,table.cmp th{border-bottom:1px solid #131d27;padding:4px 6px;text-align:right}
  table.cmp th:first-child,table.cmp td:first-child{text-align:left;color:#8fa8bc}
+ /* ---------- find similar ---------- */
+ .rate{display:flex;gap:4px;margin-top:4px}
+ .rate span{font-size:10px;padding:2px 8px;border:1px solid #22333f;border-radius:10px;
+   cursor:pointer;color:#64798d}
+ .rate span:hover{color:#c8f2ec;background:#14303a}
+ .ood{margin:8px 0;padding:9px 12px;border:1px solid #6b4a2a;border-radius:8px;
+   background:#1a120a;color:#e8c9a0;font-size:12px}
+ .bdrow{display:flex;align-items:center;gap:8px;margin:3px 0;font-size:12px}
+ .bdrow .nm{width:120px;color:#b8c8d8}
+ .bdrow .lv{width:76px;text-align:right;color:#9fe8df}
+ #uploadBox{margin:10px 0;padding:12px;border:1px dashed #2a4a55;border-radius:10px;text-align:center}
+ #uploadBox input{display:none}
+ .repswitch{display:flex;gap:6px;margin:8px 0}
  input.txt,textarea.txt{width:100%;background:#0e1a22;border:1px solid #2a4a55;color:var(--ink);
    border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit}
  .fps{position:fixed;right:12px;bottom:10px;font-size:10px;color:#3a4a5a;z-index:4}
@@ -115,6 +128,7 @@ TEMPLATE = r"""<!DOCTYPE html>
  <div class="modeseg" id="modeseg" style="display:none">
   <button class="btn on" id="modeM">◉ Movement</button><button class="btn" id="modeI">⇄ Interaction</button>
  </div>
+ <button class="btn" id="findBtn">⌕ Find Similar</button>
  <button class="btn" id="exploreBtn">☰ Explore</button>
  <button class="btn primary" id="revealBtn">✦ Reveal species</button>
 </header>
@@ -142,6 +156,7 @@ TEMPLATE = r"""<!DOCTYPE html>
 let META=null, EP=[], IDX={}, serverMode=false;
 let revealed=false, revealT=0, sel=-1, motifSel=-1, T=0;
 let mode='movement', contextShade=false;
+let QUERY=null, qSel=-1, qIntro=-1, uploadInfo=null;   // Find Similar state
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const COLORS={ant:"#e8a13c",mimic:"#4fd1c5",siler:"#4fd1c5",other_spider:"#b794f4",
               other_arthropod:"#a0aec0",unknown:"#718096"};
@@ -155,7 +170,15 @@ function fit(){cv.width=(innerWidth)*DPR;cv.height=innerHeight*DPR;cv.style.widt
 addEventListener('resize',fit);fit();
 
 fetch('data.json').then(r=>r.json()).then(d=>{boot(d);});
-fetch('api/info').then(r=>r.ok?r.json():null).then(i=>{serverMode=!!i&&!!i.clip_endpoint;}).catch(()=>{});
+fetch('api/info').then(r=>r.ok?r.json():null).then(i=>{serverMode=!!i&&!!i.clip_endpoint;
+  window.__info=i||null; refreshFindBtn();}).catch(()=>{});
+fetch('query.json').then(r=>r.ok?r.json():null).then(q=>{if(q&&q.episodes){QUERY=q;
+  qSel=q.qc.findIndex(c=>c.usable); if(qSel<0)qSel=0;
+  refreshFindBtn(); startQueryIntro();}}).catch(()=>{});
+function refreshFindBtn(){
+  const b=document.getElementById('findBtn'); if(!b)return;
+  b.textContent = QUERY? '⌕ Find Similar — your video' : '⌕ Find Similar';
+}
 
 function boot(d){
  META=d.meta;
@@ -194,6 +217,32 @@ function scaleEmbeddings(){
  });
 }
 function hash(s){let h=9;for(let i=0;i<s.length;i++)h=Math.imul(h^s.charCodeAt(i),387420489);return h>>>0;}
+
+/* ================= Find Similar: query particles ================= */
+function qHitById(qeid, rep){   // results are indexed over *usable* episodes
+  const src = rep==='b' ? (QUERY&&QUERY.results_representation_b) : (QUERY&&QUERY.results);
+  if(!src) return null;
+  return (src.episode_hits||[]).find(h=>h.query_episode_id===qeid) || null;
+}
+function qNeighbors(qe){   // top-k neighbor ids for a query episode (physical space)
+  const h=qHitById(qe.episode_id,'a');
+  return h?h.neighbors.map(n=>n.episode_id):[];
+}
+function qNeighborsB(qe){
+  const h=qHitById(qe.episode_id,'b');
+  return h?h.neighbors.map(n=>n.episode_id):[];
+}
+function qPos(qe){
+  // clamp into the canvas padding; outside-hull queries carry the OOD flag
+  return [Math.min(0.97,Math.max(0.03,qe.atlas_position[0])),
+          Math.min(0.97,Math.max(0.03,qe.atlas_position[1]))];
+}
+function startQueryIntro(){
+  if(REDUCED){qIntro=-1;return;}
+  qIntro=0;                       // 0: trajectory draws, 1: glide, -1: done
+  qIntroT0=performance.now();
+}
+let qIntroT0=0;
 
 /* ================= hero: four stages from one real trajectory ================= */
 let heroStage=0;
@@ -290,6 +339,39 @@ function draw(){
      cx.beginPath();cx.arc(x,y,11*DPR,0,7);cx.stroke();}
  }
  cx.globalAlpha=1;
+ /* ---- query particles (Find Similar) ---- */
+ if(QUERY){
+   const hi=new Set(qNeighbors(QUERY.episodes[qSel]));
+   const introU=REDUCED?1:Math.min(1,(performance.now()-qIntroT0)/2200);
+   QUERY.episodes.forEach((qe,qi)=>{
+     const [ux,uy]=qPos(qe);
+     let x=ux*W,y=uy*H;
+     if(qIntro>=0&&introU<1){        // glide from center to its real position
+       const u=introU<0.55?0:((introU-0.55)/0.45);
+       const ease=1-Math.pow(1-u,3);
+       x=(W/2+(x-W/2)*ease); y=(H/2+(y-H/2)*ease);
+     }
+     qe._sx=x; qe._sy=y;
+     const active=(qi===qSel);
+     cx.globalAlpha=1;
+     cx.strokeStyle='#ffffff'; cx.lineWidth=(active?3:2)*DPR;
+     cx.beginPath(); cx.arc(x,y,(active?10:8)*DPR,0,7); cx.stroke();
+     cx.fillStyle='#ffffff';
+     cx.beginPath(); cx.arc(x,y,3*DPR,0,7); cx.fill();
+     if(active){
+       cx.setLineDash([4*DPR,4*DPR]); cx.strokeStyle='#ffffff77';
+       cx.beginPath(); cx.arc(x,y,16*DPR,0,7); cx.stroke(); cx.setLineDash([]);
+     }
+   });
+   // neighbor emphasis: reference particles near the active query glow
+   EP.forEach((e,i)=>{
+     if(hi.has(e.id)&&e.sx!==undefined){
+       cx.globalAlpha=0.95; cx.strokeStyle='#fff'; cx.lineWidth=1.5*DPR;
+       cx.beginPath(); cx.arc(e.sx,e.sy,6.5*DPR,0,7); cx.stroke();
+     }
+   });
+   cx.globalAlpha=1;
+ }
  frames++;const now=performance.now();
  if(now-fpsT>1500){document.getElementById('fps').textContent=
    `${Math.round(frames*1000/(now-fpsT))} fps · ${EP.length.toLocaleString()} particles`;frames=0;fpsT=now;}
@@ -792,6 +874,235 @@ function toast(t){const e=document.createElement('div');e.textContent=t;
  e.style.cssText='position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#14303a;color:#c8f2ec;padding:6px 16px;border-radius:16px;font-size:13px;z-index:30;transition:opacity .4s';
  document.body.appendChild(e);setTimeout(()=>e.style.opacity=0,1400);setTimeout(()=>e.remove(),1900);}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+/* ================= Find Similar ================= */
+document.getElementById('findBtn').onclick=()=>showQuery();
+const RATE_LABELS=[["very","Very similar"],["similar","Similar"],["weak","Weakly similar"],["not","Not similar"]];
+function showQuery(){
+ if(!QUERY&&!((window.__info||{}).find_similar_upload))
+   { showQueryHelp(); return; }
+ if(!QUERY){ showUpload(); return; }
+ qRender();
+}
+function showQueryHelp(){
+ panel.innerHTML=`<h1>Find Similar</h1>
+  <div class="tabbar">${tabbar('data')}</div>
+  <div class="muted">Drop in a video and see what moves like it.</div>
+  <div class="prov">python -m motionscape find-similar VIDEO.mp4 --query-id my_query \
+    --reference motionscape_runs/reference --atlas &lt;atlas_dir&gt;</div>
+  <div class="muted" style="margin-top:8px">Then reload this page — your movement enters the atlas.
+   Or start the server with --reference to upload from here.</div>`;
+ openPanel();
+}
+function showUpload(){
+ panel.innerHTML=`<h1>Find Similar</h1>
+  <div class="muted">Upload a video: detection → episodes → behavior encoding →
+   your movement enters the atlas and nearby movements light up.</div>
+  <div id="uploadBox">
+   <label class="btn" style="display:inline-block">Choose a video
+    <input type="file" id="qfile" accept="video/*"></label>
+   <div class="muted" style="margin-top:6px">processed locally — never leaves this machine</div>
+  </div>
+  <div id="qprog" class="muted"></div>
+  <div class="muted" style="margin-top:8px">Tiny-animal footage: lower the detection threshold / min area.</div>
+  <div style="display:flex;gap:6px;margin-top:8px">
+    <label class="muted">threshold <input class="txt" id="dTh" value="26" style="width:60px"></label>
+    <label class="muted">min area <input class="txt" id="dAr" value="2" style="width:60px"></label>
+  </div>`;
+ openPanel();
+ const f=panel.querySelector('#qfile');
+ f.onchange=()=>{
+   const file=f.files[0]; if(!file)return;
+   const det={threshold:parseInt(panel.querySelector('#dTh').value)||26,
+              min_area:parseInt(panel.querySelector('#dAr').value)||2, morph_open_k:0};
+   panel.querySelector('#qprog').textContent='processing… (detection → episodes → encoding)';
+   fetch('api/find-similar',{method:'POST',body:file,
+     headers:{'X-Filename':file.name,'Content-Type':'application/octet-stream',
+              'X-Detector-Params':JSON.stringify(det)}}).then(r=>r.json()).then(o=>{
+     if(!o.started)panel.querySelector('#qprog').textContent='upload failed: '+(o.error||'?');
+   });
+   const poll=setInterval(()=>{
+     fetch('api/query-status').then(r=>r.json()).then(s=>{
+       if(s.running)panel.querySelector('#qprog').textContent='processing…';
+       else{clearInterval(poll);
+         if(s.error)panel.querySelector('#qprog').textContent='failed: '+s.error;
+         else{fetch('query.json').then(r=>r.json()).then(q=>{QUERY=q;qSel=0;
+             refreshFindBtn();qRender();});}
+       }});
+   },1500);
+ };
+}
+function rateRow(refId,rep){
+ return `<div class="rate" data-ref="${refId}" data-rep="${rep}">`+
+  RATE_LABELS.map(([k,l])=>`<span onclick="qRate('${refId}','${rep}','${k}',this)">${l}</span>`).join('')+`</div>`;
+}
+window.qRate=function(refId,rep,rating,el){
+ const qe=QUERY.episodes[qSel];
+ const rec={query_episode_id:qe.episode_id, reference_episode_id:refId,
+            representation:rep, rating, query_id:QUERY.query_id};
+ if(window.__info&&window.__info.server){
+   fetch('api/query-rate',{method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify(rec)}).then(()=>{el.parentElement.style.opacity=.45;});
+ } else {
+   const k='ms_qrate'; const all=JSON.parse(localStorage.getItem(k)||'[]'); all.push(rec);
+   localStorage.setItem(k,JSON.stringify(all)); el.parentElement.style.opacity=.45;
+ }
+};
+function qMeta(qe){   // meta-like object for a query episode (panel + compare)
+ return {episode_id:qe.episode_id, video_id:QUERY.query_id, clip_kind:'video',
+   label:'query', duration_s:qe.duration_s, fps:qe.fps, frames:qe.frames,
+   series:qe.series, trajectory:qe.trajectory, features:qe.features,
+   sampling:{site:'your video',session:'',video:QUERY.query_id},
+   provenance_chain:['query video: '+(QUERY.video_path||''),
+     'encoder: '+((QUERY.encoder_provenance||{}).model_name||'?')+
+       ' v'+((QUERY.encoder_provenance||{}).model_version||'?'),
+     'reference atlas: '+QUERY.reference_atlas_version],
+   neighbors:[]};
+}
+function qRender(){
+ const r=QUERY.results, rb=QUERY.results_representation_b;
+ const qe=QUERY.episodes[qSel];
+ const qc=QUERY.qc[qSel];
+ const hitA=qHitById(qe.episode_id,'a'), hitB=qHitById(qe.episode_id,'b');
+ const bd=hitA&&hitA.breakdown;
+ const bdNames={trajectory_geometry:'Trajectory geometry',speed_dynamics:'Speed dynamics',
+   turning_dynamics:'Turning dynamics',stop_go_rhythm:'Stop–go rhythm',
+   intermittency:'Intermittency'};
+ panel.innerHTML=`
+  <div style="display:flex;align-items:center;gap:8px">
+   <span style="color:var(--accent)">⌕ Your video</span>
+   <span class="muted">${QUERY.query_id} · ref ${QUERY.reference_atlas_version}</span>
+   <span class="sp" style="flex:1"></span>
+   <button class="btn" style="padding:3px 10px" onclick="closePanel()">esc</button></div>
+  ${r.ood.any_flagged?`<div class="ood">⚠ ${esc(r.ood.message)} Physical-space distances are large
+   (often units/calibration differences); see the shape-normalized view below.</div>`:''}
+  <div class="muted" style="margin:8px 0">Your movement episodes — click one to place it in the atlas:</div>
+  ${QUERY.episodes.map((e,i)=>{
+    const c=QUERY.qc[i]; const act=i===qSel;
+    return `<div class="nbr" style="${act?'background:#101a24;border-color:#3b6a75':''};${c&&!c.usable?'opacity:.45':''}"
+      onclick="qSel=${i};qRender();">
+      <div><span class="lbl" style="color:#8fa8bc">episode ${i+1}</span>
+      <div class="muted">${e.duration_s.toFixed(1)}s${c&&c.warnings.length?' · '+c.warnings.join(', '):''}</div></div></div>`;}).join('')}
+  ${(!qc.usable)?`<div class="ood">Low-confidence behavioral retrieval — this episode has quality issues
+   (${esc(qc.warnings.join(', '))}). Neighbors are shown for exploration, not as evidence.</div>`:''}
+  ${hitA&&hitA.neighbors.length?`
+  <div style="margin-top:10px;color:var(--accent)">Closest movements — physical feature space</div>
+  <div class="muted">nearest in ${META.features.length}-D interpretable feature space</div>
+  ${hitA.neighbors.map((n,k)=>{
+    const ne=IDX[n.episode_id]||{};
+    return `<div class="nbr" data-nid="${n.episode_id}" onclick="showById('${n.episode_id}')">
+      <canvas width="192" height="120" data-traj="${n.episode_id}"></canvas>
+      <div><span class="lbl" style="color:${revealed?(COLORS[n.taxon]||'#888'):'#8fa8bc'}">${revealed?(NAMES[n.taxon]||n.taxon):'Movement '+(k+1)}</span>
+      <div class="muted dur">similarity ${n.similarity.toFixed(2)}</div>
+      ${rateRow(n.episode_id,'a')}</div></div>`;}).join('')}
+  <button class="btn" style="margin-top:6px" onclick="compareQuery('a')">⇄ compare with closest (physical)</button>`:''}
+  ${hitB&&hitB.neighbors.length?`
+  <div style="margin-top:12px;color:var(--accent)">Closest movements — shape-normalized space</div>
+  <div class="muted">movement SHAPE only (burst structure, rhythm); robust to unit and camera differences</div>
+  ${hitB.neighbors.map((n,k)=>{
+    const ne=IDX[n.episode_id]||{};
+    return `<div class="nbr" data-nid="${n.episode_id}" onclick="showById('${n.episode_id}')">
+      <canvas width="192" height="120" data-traj="${n.episode_id}"></canvas>
+      <div><span class="lbl" style="color:${revealed?(COLORS[n.taxon]||'#888'):'#8fa8bc'}">${revealed?(NAMES[n.taxon]||n.taxon):'Movement '+(k+1)}</span>
+      <div class="muted dur">similarity ${n.similarity.toFixed(2)}</div>
+      ${rateRow(n.episode_id,'b')}</div></div>`;}).join('')}
+  <button class="btn" style="margin-top:6px" onclick="compareQuery('b')">⇄ compare with closest (shape)</button>`:''}
+  ${bd?`<div style="margin-top:12px;color:var(--accent)">Why similar? — real distance decomposition</div>
+   ${Object.entries(bd).map(([g,v])=>`<div class="bdrow"><span class="nm">${bdNames[g]||g}</span>
+     <span style="flex:1;height:9px;background:#101a24;border-radius:3px;position:relative">
+     <span style="position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:#4fd1c5;width:${Math.max(4,100-Math.min(100,v.mean_standardized_diff*45))|0}%"></span></span>
+     <span class="lv">${v.similarity}</span></div>`).join('')}
+   <div class="muted">levels from mean standardized feature differences — never invented</div>`:''}
+  ${r.motif_hits.length?`<div style="margin-top:12px;color:var(--accent)">Closest motifs</div>
+   ${r.motif_hits.map(m=>`<div class="bdrow"><span class="nm">M${m.motif}</span>
+     <span class="muted">similarity ${m.similarity.toFixed(2)}</span></div>`).join('')}`:''}
+  ${(rb&&rb.taxa&&rb.taxa.length)?`<div style="margin-top:12px;color:var(--accent)">Behaviorally similar taxa <span class="muted">— not species identity</span></div>
+   ${rb.taxa.map(tx=>`<div class="bdrow"><span class="nm">${esc(tx.taxon)}</span>
+     <span style="flex:1;height:9px;background:#101a24;border-radius:3px;position:relative">
+     <span style="position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:#e8a13c;width:${Math.min(100,(tx.score_corrected*200)|0)}%"></span></span>
+     <span class="muted">n=${tx.n_reference_episodes} · score ${tx.score_corrected.toFixed(2)}</span></div>`).join('')}
+   <div class="muted">sample-size-corrected (shrinkage); support counts shown</div>`:''}
+  <div class="prov">reference ${QUERY.reference_atlas_version} · metric ${QUERY.metric} · k ${QUERY.k}
+
+${esc(JSON.stringify((QUERY.provenance||{}).parameters||{}).slice(0,300))}</div>`;
+ openPanel();
+ (hitA?hitA.neighbors:[]).concat(hitB?hitB.neighbors:[]).forEach(n=>{
+   fetchMeta(n.episode_id).then(nm=>{if(!nm)return;
+     const col=revealed?(COLORS[n.taxon]||'#4fd1c5'):'#56677a';
+     panel.querySelectorAll(`canvas[data-traj="${n.episode_id}"]`).forEach(c=>
+       drawStaticReplay(c,nm.trajectory||[],col));
+     panel.querySelectorAll(`.nbr[data-nid="${n.episode_id}"] .dur`).forEach(el=>{
+       el.textContent=`similarity ${n.similarity.toFixed(2)} · ${nm.duration_s.toFixed(1)}s`;});});});
+}
+window.compareQuery=async function(rep){
+ const qe=QUERY.episodes[qSel];
+ const hit=qHitById(qe.episode_id,rep);
+ if(!hit||!hit.neighbors.length)return;
+ const qm=qMeta(qe);
+ const m2=await fetchMeta(hit.neighbors[0].episode_id); if(!m2)return;
+ const e2=IDX[hit.neighbors[0].episode_id];
+ const nameA=`<span class="lbl" style="color:#ffffff">your video</span>`;
+ const nameB=revealed?`<span class="lbl" style="color:${COLORS[e2.l]}">${NAMES[e2.l]||e2.l}</span>`
+                     :`<span class="lbl" style="color:#8fa8bc">movement</span>`;
+ panel.innerHTML=`
+  <div style="display:flex;align-items:center;gap:8px">
+    <button class="btn" style="padding:3px 10px" onclick="qRender()">← back</button>
+    <span class="muted">side-by-side · shared playhead</span>
+    <span class="sp" style="flex:1"></span>
+    <button class="btn" style="padding:3px 10px" id="pbMode">normalized</button></div>
+  <div class="split" style="margin-top:10px">
+   <div>${nameA}<div class="muted">${qe.duration_s.toFixed(1)}s</div><img class="clip" id="cmpA"></div>
+   <div>${nameB}<div class="muted">${e2.d.toFixed(1)}s</div><img class="clip" id="cmpB"></div>
+  </div>
+  <div class="muted">similarity ${hit.neighbors[0].similarity.toFixed(2)} (${rep==='a'?'physical':'shape-normalized'} space).
+   “normalized”: both sides loop through their full clip together. “real-time”: each advances with the wall clock at its own fps.</div>
+  <div id="cmpRowsA"></div><div id="cmpRowsB"></div>
+  <div class="prov">your video: ${esc(qm.provenance_chain.join('\n'))}\n---\nref: ${esc(m2.provenance_chain.join('\n'))}</div>`;
+ openPanel();
+ replayFallback(panel.querySelector('#cmpA'),qm,{l:'query'});
+ if(serverMode&&m2.clip_kind==='video'){panel.querySelector('#cmpB').src=`clip/${e2.id}.gif`;}
+ else replayFallback(panel.querySelector('#cmpB'),m2,e2);
+ for(const [mm,host] of [[qm,'cmpRowsA'],[m2,'cmpRowsB']]){
+   document.getElementById(host).innerHTML=sparkRow('speed','#4fd1c5')+sparkRow('moving','#b794f4');
+   document.getElementById(host).querySelectorAll('canvas.spark').forEach(c=>{
+     c._arr=sparkArr(mm,c.dataset.lab);
+     const g=c.getContext('2d'),vs=c._arr.filter(v=>v!=null&&isFinite(v));
+     const mx=Math.max(...vs,1e-9);g.strokeStyle=c.dataset.c;g.lineWidth=2.5;g.beginPath();
+     let st=false;c._arr.forEach((v,i)=>{if(v==null||!isFinite(v)){st=false;return;}
+       const x=i/(c._arr.length-1||1)*c.width,y=c.height-6-(v/mx)*(c.height-12);
+       st?g.lineTo(x,y):g.moveTo(x,y);st=true;});g.stroke();});
+ }
+ const cA=document.createElement('canvas'),cB=document.createElement('canvas');
+ [cA,cB].forEach(c=>{c.width=360;c.height=200;c.style.width='100%';c.style.background='#04070b';
+   c.style.borderRadius='8px';});
+ document.getElementById('cmpRowsA').prepend(cA);
+ document.getElementById('cmpRowsB').prepend(cB);
+ let paused=false,t0=performance.now(),clock=0,mode='normalized';
+ const durN=Math.max(Math.min(qe.duration_s,m2.duration_s),1)*1000;
+ const fpsA=qm.fps||30, fpsB=m2.fps||30;
+ const btn=document.getElementById('pbMode');
+ btn.onclick=()=>{mode=mode==='normalized'?'real-time':'normalized';
+   btn.textContent=mode;};
+ cA.onclick=()=>{paused=!paused;};
+ (function loop(now){
+   if(!document.getElementById('cmpRowsA'))return;
+   const dt=now-t0; t0=now; if(!paused)clock+=dt;
+   let pA,pB;
+   if(mode==='normalized'){pA=(clock/durN)%1;pB=(clock/durN)%1;}
+   else{pA=(clock/(qe.duration_s*1000))%1;pB=(clock/(m2.duration_s*1000))%1;}
+   drawReplayProgress(cA,qm.trajectory,pA,'#4fd1c5');
+   drawReplayProgress(cB,m2.trajectory||[],pB,'#e8a13c');
+   document.querySelectorAll('#cmpRowsA canvas.spark, #cmpRowsB canvas.spark').forEach(c=>{
+     if(!c._base){c._base=document.createElement('canvas');c._base.width=c.width;
+       c._base.height=c.height;c._base.getContext('2d').drawImage(c,0,0);}
+     const g=c.getContext('2d');g.clearRect(0,0,c.width,c.height);
+     g.drawImage(c._base,0,0);
+     const prog=(c.closest('#cmpRowsA')?pA:pB)*c.width;
+     g.strokeStyle='#ffffff88';g.lineWidth=2;g.beginPath();
+     g.moveTo(prog,0);g.lineTo(prog,c.height);g.stroke();});
+   requestAnimationFrame(loop);
+ })(performance.now());
+};
 
 /* ================= Reveal species ================= */
 const revealBtn=document.getElementById('revealBtn');

@@ -43,7 +43,11 @@ def trajectory_features(centroids: list[list[float]], fps: float,
     steps = np.diff(fr)
     step = int(np.bincount(steps[steps > 0]).argmax()) if (steps > 0).any() else 1
     dt = step / fps                           # true seconds between samples
-    same_run = steps == step                  # within a continuous sampling run
+    # continuous-run tolerance: gap-bridged tracks (sparse detection) have
+    # jittery spacing; +-25% of the median step still counts as a real step,
+    # while arbitrary teleports never do
+    tol = max(1, int(round(step * 0.25)))
+    same_run = np.abs(steps - step) <= tol
     d = np.hypot(*np.diff(xy_c, axis=0).T)   # step length per sample
     v = (d / dt)[same_run]                    # speed within continuous runs
     heading = np.arctan2(*np.diff(xy_c, axis=0).T[::-1])

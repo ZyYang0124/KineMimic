@@ -366,6 +366,14 @@ def build_atlas(episodes: list[Episode], out_dir: str | Path,
     (out_dir / "data.json").write_text(
         json.dumps({"meta": meta, "episodes": slim}, ensure_ascii=False),
         encoding="utf-8")
+    # persist the atlas projection: query particles must land at their real
+    # position in THIS space (motionscape find-similar uses it)
+    (out_dir / "atlas_projection.json").write_text(json.dumps({
+        "feature_order": names, "mu": mu.tolist(), "sd": sd.tolist(),
+        "components": Vt[:2].tolist(),
+        "explained_variance_ratio": [round(float(v), 4) for v in evr],
+        "blind_to_labels": True,
+    }), encoding="utf-8")
     _write_index(out_dir)
     return out_dir / "index.html"
 

@@ -33,27 +33,42 @@ class Track:
 
 
 class GreedyTracker:
-    """Nearest-neighbour association within a max jump distance."""
+    """Nearest-neighbour association within a max jump distance.
 
-    def __init__(self, max_jump_px: float = 60.0):
+    ``max_gap``: how many consecutive missed frames a track may survive
+    (0 = any dropout ends the matchable chain — the original, strictest
+    behavior). Small positive values let sporadic detections of the same
+    animal chain into one track; reliability is still enforced downstream
+    by episode minimum duration and QC coverage."""
+
+    def __init__(self, max_jump_px: float = 60.0, max_gap: int = 0):
         self.max_jump_px = max_jump_px
+        self.max_gap = max_gap
         self.tracks: list[Track] = []
         self._next_id = 0
 
     def step(self, frame_idx: int, dets: list[dict]) -> None:
-        live = [t for t in self.tracks if t.last_frame == frame_idx - 1]
+        gap = self.max_gap + 1
+        live = [t for t in self.tracks
+                if 0 < frame_idx - t.last_frame <= gap]
         used = set()
-        for t in live:
+        # nearest tracks first so sparse detections go to the closest track
+        for t in sorted(live, key=lambda t: -t.last_frame):
             if not dets:
                 break
+            tol = self.max_jump_px * (frame_idx - t.last_frame)
             dists = [np.hypot(*(np.array(d["centroid"]) - t.last_pos)) for d in dets]
-            j = int(np.argmin(dists))
-            if j not in used and dists[j] <= self.max_jump_px:
-                t.frames.append(frame_idx)
-                t.centroids.append(dets[j]["centroid"])
-                t.bboxes.append(dets[j]["bbox"])
-                t.confidences.append(dets[j]["confidence"])
-                used.add(j)
+            order = np.argsort(dists)
+            for j in order:
+                if j in used:
+                    continue
+                if dists[j] <= tol:
+                    t.frames.append(frame_idx)
+                    t.centroids.append(dets[j]["centroid"])
+                    t.bboxes.append(dets[j]["bbox"])
+                    t.confidences.append(dets[j]["confidence"])
+                    used.add(j)
+                    break
         for j, d in enumerate(dets):
             if j not in used:
                 tr = Track(self._next_id); self._next_id += 1

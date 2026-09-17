@@ -16,11 +16,15 @@ MODEL_NAME = "bgdiff-v1"
 
 class BgDiffDetector:
     def __init__(self, threshold: int = 35, min_area: int = 15, max_area: int = 2500,
-                 bg_samples: int = 60):
+                 bg_samples: int = 60, morph_open_k: int = 3):
+        """``morph_open_k``: opening kernel size. Reduce (or set 0 to skip)
+        for tiny targets — a 3x3 opening erases connected components of a
+        few pixels, which real small-animal footage produces."""
         self.threshold = threshold
         self.min_area = min_area
         self.max_area = max_area
         self.bg_samples = bg_samples
+        self.morph_open_k = morph_open_k
 
     def fit_background(self, video_path: str) -> np.ndarray:
         cap = cv2.VideoCapture(video_path)
@@ -40,7 +44,9 @@ class BgDiffDetector:
     def detect_frame(self, gray: np.ndarray, bg: np.ndarray) -> list[dict]:
         diff = cv2.absdiff(gray, bg.astype(np.uint8))
         _, mask = cv2.threshold(diff, self.threshold, 255, cv2.THRESH_BINARY)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+        if self.morph_open_k > 1:
+            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN,
+                                    np.ones((self.morph_open_k, self.morph_open_k), np.uint8))
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
         n, labels, stats, _ = cv2.connectedComponentsWithStats(mask)
         dets = []

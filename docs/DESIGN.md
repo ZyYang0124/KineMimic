@@ -83,6 +83,19 @@ distribution). Proximity ≠ interaction; correlation ≠ causation; outputs
 in `interactions.jsonl` / `scene_windows.jsonl` / `interaction_summary.json`
 with full provenance. See docs/INTERACTIONS.md.
 
+## Behavior Encoder & Retrieval (V0.4)
+
+Encoders map episodes to fixed-dim behavior vectors, label-blind by API
+(docs/MODEL_CARD.md): A = interpretable kinematics → PCA; B = shape-
+normalized movement series → PCA. The Reference Atlas Index is versioned
+(`atlas_reference_vNNN`, policy-filtered, self-contained with its
+episodes), search is exact with a swappable ANN backend, and retrieval
+returns episodes, motifs, and behaviorally similar taxa (centroid +
+Wasserstein distribution distances, sample-size-corrected scores).
+Queries carry QC flags, an OOD flag (95th percentile of reference
+internal NN distances), a real distance-decomposition explanation, and
+their own provenance. See docs/RETRIEVAL.md.
+
 ## Sampling hierarchy (anti-pseudo-replication)
 
 Site → Session → Video → Episode is stored explicitly (site_id,

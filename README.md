@@ -70,7 +70,9 @@ python -m motionscape annotate <run>/episodes.jsonl   # human QC + labels
 python -m motionscape atlas <run>/episodes.jsonl --out <run>/atlas_v2
 python -m motionscape serve <run>/atlas_v2 --episodes <run>/episodes.jsonl
 python -m motionscape interact <run_dir>             # scenes + social context
-python -m motionscape benchmark --n 5000 10000        # scale checks
+python -m motionscape build-reference RUN/episodes.jsonl --out reference
+python -m motionscape find-similar NEW.mp4 --query-id q1     --reference reference --atlas <atlas_dir>         # drop in a video
+python -m motionscape eval-retrieval reference        # retrieval benchmark
 ```
 
 ## Your own videos
@@ -104,7 +106,7 @@ the movement analysis and can never serve as ground truth — the workbench
 7. **Episodes ≠ replicates.** The sampling hierarchy is stored and
    statistics must respect it.
 
-## Status (V0.3)
+## Status (V0.4)
 
 - Detection (swappable bg-diff), short-term greedy tracker, episode QC
 - 16 kinematic features; transparent machine pre-classifier (separate
@@ -127,12 +129,21 @@ the movement analysis and can never serve as ground truth — the workbench
   episode-shuffle null and a distance-response scan; proximity ≠
   interaction, correlation ≠ causation, scene identity kept
   (docs/INTERACTIONS.md)
+- **Behavior retrieval** — Find Similar: drop in a video, it is
+  detected/segmented/encoded and dropped into the Murmur at its real
+  projected position; nearest episodes (dual representation: physical +
+  shape-normalized), closest motifs, behaviorally similar taxa (with
+  sample-size correction and support counts), similarity breakdown from
+  real distance decomposition, OOD detection, query QC, and human
+  similarity ratings — all versioned and reproducible
+  (docs/RETRIEVAL.md, docs/MODEL_CARD.md)
 - Real data: Shamble 2017 (228 episodes, gold labels), Zeng 2023 (64
   velocity/pose episodes incl. non-mimetic control), own field video
 
 ## Roadmap
 
-Interaction V1 (lagged coupling, synchrony nulls), Interaction Space +
-Dictionary (V2), pose-level interaction (V3), behavioral grammar, more
-sites/sessions of field footage toward the 5,000-episode goal, UMAP as an
-alternative (still-blind) space.
+Learned (self-supervised, contrastive) MotionScape encoder behind the
+existing BehaviorVector interface, lagged interaction coupling (V1),
+Interaction Space + Dictionary (V2), pose-level interaction (V3),
+phylogeny × behavior convergence analysis, more sites/sessions of field
+footage toward the 5,000-episode goal.

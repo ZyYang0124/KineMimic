@@ -31,16 +31,90 @@ from .store import EpisodeStore
 
 
 class AtlasServer:
-    def __init__(self, atlas_dir: str | Path, episodes_path: str | Path | None = None):
+    def __init__(self, atlas_dir: str | Path, episodes_path: str | Path | None = None,
+                 reference_dir: str | Path | None = None):
         self.atlas_dir = Path(atlas_dir).resolve()
         self.episodes_path = Path(episodes_path) if episodes_path else None
+        self.reference_dir = Path(reference_dir) if reference_dir else None
         self._ep_by_id: dict[str, Episode] | None = None
+        self._query_eps: dict[str, Episode] = {}      # from query.json (upload flow)
+        self._ref_by_id: dict[str, Episode] | None = None
+        self._job = {"running": False, "done": False, "error": None, "query_id": None}
         self._lock = threading.Lock()
         if self.episodes_path is None:
             # convenience: a run directory's atlas sits next to episodes.jsonl
             cand = self.atlas_dir.parent / "episodes.jsonl"
             if cand.exists():
                 self.episodes_path = cand
+        self._load_query_episodes()
+
+    def _ref_episodes(self) -> dict[str, Episode]:
+        """Reference index episodes (for /meta fallback of cross-dataset
+        neighbors — the served atlas may not contain them)."""
+        if self._ref_by_id is None:
+            self._ref_by_id = {}
+            if self.reference_dir:
+                import glob as _glob
+                cands = sorted(Path(self.reference_dir).glob(
+                    "atlas_reference_v*/episodes.jsonl"))
+                if cands:
+                    for e in EpisodeStore.read_episodes(cands[-1]):
+                        self._ref_by_id[e.episode_id] = e
+            self._ref_by_id.update(self._query_eps)
+        return self._ref_by_id
+
+    def _reference_meta(self, episode_id: str):
+        """Build a meta payload for a reference-only episode on demand."""
+        ep = self._ref_episodes().get(episode_id)
+        if ep is None:
+            return None
+        from .atlas import episode_meta
+        return episode_meta(ep)
+
+    def _load_query_episodes(self):
+        """Query episodes (uploaded videos) can request clips too."""
+        q = self.atlas_dir / "query.json"
+        if q.exists():
+            try:
+                bundle = json.loads(q.read_text(encoding="utf-8"))
+                self._query_eps = {d["episode_id"]: Episode.from_dict(d)
+                                   for d in bundle.get("episode_dicts", [])}
+            except Exception:
+                self._query_eps = {}
+
+    def run_query_job(self, video_bytes: bytes, filename: str,
+                      detector_params: dict | None = None):
+        """Find Similar upload: save video, run the query pipeline, write
+        query.json into the atlas dir (the browser picks it up)."""
+        try:
+            from .query import run_query
+            uploads = self.atlas_dir / "uploads"
+            uploads.mkdir(parents=True, exist_ok=True)
+            ts = time.strftime("%Y%m%d_%H%M%S")
+            safe = "".join(c for c in Path(filename).name if c.isalnum() or c in "._-") or "video.mp4"
+            vpath = uploads / f"{ts}_{safe}"
+            vpath.write_bytes(video_bytes)
+            qid = f"upload_{ts}"
+            self._job = {"running": True, "done": False, "error": None, "query_id": qid}
+            bundle = run_query(str(vpath), qid, self.reference_dir,
+                               out_dir=self.atlas_dir, atlas_dir=self.atlas_dir,
+                               detector_params=detector_params)
+            self._load_query_episodes()
+            self._job = {"running": False, "done": True,
+                         "error": bundle.get("error"),
+                         "query_id": qid,
+                         "n_episodes": len(bundle.get("episodes", []))}
+        except Exception as e:                     # pragma: no cover
+            self._job = {"running": False, "done": True, "error": str(e),
+                         "query_id": None}
+
+    def save_query_rating(self, record: dict) -> dict:
+        path = self.atlas_dir / "query_evaluations.jsonl"
+        record = {**record, "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+        with self._lock:
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(record) + "\n")
+        return record
 
     # ---- episode lookup (lazy full parse only on first media request) ----
     def _episodes(self) -> dict[str, Episode]:
@@ -54,7 +128,7 @@ class AtlasServer:
             return self._ep_by_id
 
     def episode(self, episode_id: str) -> Episode | None:
-        return self._episodes().get(episode_id)
+        return self._episodes().get(episode_id) or self._query_eps.get(episode_id)
 
     def clip_path(self, episode_id: str) -> Path | None:
         """Generate (once) and return the cached GIF for an episode."""
@@ -121,9 +195,17 @@ def make_handler(server: AtlasServer):
                 return self._file(server.atlas_dir / "index.html", "text/html; charset=utf-8")
             if p == "/data.json":
                 return self._file(server.atlas_dir / "data.json", "application/json")
+            if p == "/query.json":
+                return self._file(server.atlas_dir / "query.json", "application/json")
             if p.startswith("/meta/"):
                 eid = Path(unquote(p)).stem
-                return self._file(server.atlas_dir / "meta" / f"{eid}.json", "application/json")
+                f = server.atlas_dir / "meta" / f"{eid}.json"
+                if f.is_file():
+                    return self._file(f, "application/json")
+                m = server._reference_meta(eid)   # cross-dataset neighbor
+                if m is not None:
+                    return self._json(m)
+                return self._json({"error": "not found"}, 404)
             if p.startswith("/clip/"):
                 eid = Path(unquote(p)).stem
                 try:
@@ -136,13 +218,47 @@ def make_handler(server: AtlasServer):
             if p == "/api/info":
                 return self._json({"server": "motionscape-serve", "atlas": server.atlas_dir.name,
                                    "n_episodes_meta": len(server._episodes()),
-                                   "clip_endpoint": True})
+                                   "clip_endpoint": True,
+                                   "reference": (str(server.reference_dir)
+                                                 if server.reference_dir else None),
+                                   "find_similar_upload": server.reference_dir is not None})
+            if p == "/api/query-status":
+                return self._json(server._job)
+            if p == "/api/query":
+                q = server.atlas_dir / "query.json"
+                if q.exists():
+                    return self._file(q, "application/json")
+                return self._json({"no_query": True}, 404)
             if p == "/api/motifs":
                 return self._json(server.motif_annotations())
             self._json({"error": "unknown path"}, 404)
 
         def do_POST(self):
-            if urlparse(self.path).path != "/api/motifs":
+            pth = urlparse(self.path).path
+            if pth == "/api/find-similar":
+                if server.reference_dir is None:
+                    return self._json({"error": "server started without --reference"}, 400)
+                length = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(length)
+                fname = self.headers.get("X-Filename", "upload.mp4")
+                det = {}
+                if self.headers.get("X-Detector-Params"):
+                    try:
+                        det = json.loads(self.headers["X-Detector-Params"])
+                    except Exception:
+                        det = {}
+                threading.Thread(target=server.run_query_job,
+                                 args=(body, fname, det), daemon=True).start()
+                return self._json({"started": True})
+            if pth == "/api/query-rate":
+                try:
+                    n = int(self.headers.get("Content-Length", 0))
+                    b = json.loads(self.rfile.read(n) or b"{}")
+                    rec = server.save_query_rating(b)
+                    return self._json({"saved": rec})
+                except Exception as e:
+                    return self._json({"error": str(e)}, 400)
+            if pth != "/api/motifs":
                 return self._json({"error": "unknown path"}, 404)
             try:
                 n = int(self.headers.get("Content-Length", 0))
@@ -158,12 +274,13 @@ def make_handler(server: AtlasServer):
 
 
 def serve_atlas(atlas_dir: str | Path, episodes_path: str | Path | None = None,
-                port: int = 8694) -> None:
-    server = AtlasServer(atlas_dir, episodes_path)
+                port: int = 8694, reference_dir: str | Path | None = None) -> None:
+    server = AtlasServer(atlas_dir, episodes_path, reference_dir=reference_dir)
     httpd = ThreadingHTTPServer(("127.0.0.1", port), make_handler(server))
     print(f"MOTIONSCAPE atlas: http://127.0.0.1:{port}/  (Ctrl+C to stop)")
     print(f"  atlas dir: {server.atlas_dir}")
     print(f"  episodes:  {server.episodes_path or '(media disabled — static mode)'}")
+    print(f"  reference: {server.reference_dir or '(Find Similar upload disabled)'}")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

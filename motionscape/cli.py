@@ -110,7 +110,8 @@ def cmd_annotate(args):
 
 def cmd_serve(args):
     from .serve import serve_atlas
-    serve_atlas(args.atlas, episodes_path=args.episodes, port=args.port)
+    serve_atlas(args.atlas, episodes_path=args.episodes, reference_dir=args.reference,
+                port=args.port)
 
 
 def cmd_atlas(args):
@@ -178,6 +179,94 @@ def cmd_interact(args):
           f"--out {run_dir / 'atlas_v2'}  (Interaction Mode appears automatically)")
 
 
+def cmd_build_reference(args):
+    """Build a versioned Reference Atlas Index from one or more runs."""
+    from .query import build_reference
+    from .retrieval import IndexPolicy
+    from .store import EpisodeStore as ES
+    eps = []
+    for p in args.episodes:
+        eps += ES.read_episodes(p)
+    policy = IndexPolicy(name=args.policy, min_duration_s=args.min_duration_s,
+                         require_human_label=args.require_human)
+    out = build_reference(eps, args.out, dim=args.dim, policy=policy,
+                          previous_version=args.parent)
+    idx = out["index"]
+    print(f"reference index: {idx.version_id}")
+    print(f"  episodes: {out['n_kept']} kept / {out['n_input']} input "
+          f"(policy: {policy.name}, min {args.min_duration_s}s)")
+    print(f"  encoders: {', '.join(out['encoders'])} (dim={args.dim})")
+    print(f"  taxa: {getattr(idx, 'entries_meta', {}).get('taxon_counts', {})}")
+    print(f"  dir: {Path(args.out) / idx.version_id}")
+
+
+def cmd_find_similar(args):
+    """Drop in a video. See what moves like it."""
+    from .interaction import load_summary  # noqa: F401 (parity import guard)
+    from .query import run_query
+    detector_params = {}
+    if args.min_area is not None:
+        detector_params["min_area"] = args.min_area
+    if args.threshold is not None:
+        detector_params["threshold"] = args.threshold
+    if args.no_morph_open:
+        detector_params["morph_open_k"] = 0
+    bundle = run_query(args.video, args.query_id, args.reference,
+                       store_dir=args.store, out_dir=args.out,
+                       atlas_dir=args.atlas, k=args.k, metric=args.metric,
+                       target_fps=args.target_fps,
+                       min_duration_s=args.min_duration_s,
+                       detector_params=detector_params or None,
+                       tracker_max_gap=args.max_gap)
+    if bundle.get("error"):
+        print(f"query failed: {bundle['error']}")
+        return
+    print(f"find-similar: {args.query_id} ({bundle['build_seconds']}s)")
+    print(f"  reference: {bundle['reference_atlas_version']} "
+          f"(metric={args.metric}, k={args.k})")
+    print(f"  query episodes: {len(bundle['episodes'])} "
+          f"({sum(1 for q in bundle['qc'] if q['usable'])} usable)")
+    r = bundle["results"]
+    for h in r["episode_hits"][:3]:
+        top = h["neighbors"][0] if h["neighbors"] else None
+        if top:
+            print(f"  {h['query_episode_id'][:18]} -> {top['episode_id'][:18]} "
+                  f"[{top['taxon']}] sim {top['similarity']:.2f}")
+    for m in r["motif_hits"][:3]:
+        print(f"  motif M{m['motif']} sim {m['similarity']:.2f}")
+    for t in r["taxa"][:3]:
+        print(f"  taxa {t['taxon']} (n={t['n_reference_episodes']}) "
+              f"score {t['score_corrected']:.2f} "
+              f"[centroid d {t['centroid_distance']:.2f} · wasserstein {t['distribution_wasserstein']:.3f}]")
+    if r["ood"]["any_flagged"]:
+        print(f"  ⚠ OOD (physical space): {r['ood']['message']}")
+    rb = bundle.get("results_representation_b")
+    if rb:
+        for h in rb["episode_hits"][:3]:
+            if h["neighbors"]:
+                n0 = h["neighbors"][0]
+                print(f"  [shape] {h['query_episode_id'][:18]} -> "
+                      f"{n0['episode_id'][:18]} [{n0['taxon']}] "
+                      f"sim {n0['similarity']:.2f}")
+        for t2 in rb.get("taxa", [])[:3]:
+            print(f"  [shape] taxa {t2['taxon']} (n={t2['n_reference_episodes']}) "
+                  f"score {t2['score_corrected']:.2f}")
+        if rb.get("ood", {}).get("any_flagged"):
+            print("  ⚠ OOD (shape space): query outside well-sampled region")
+    if bundle.get("consistency") and bundle["consistency"].get("mean_jaccard") is not None:
+        print(f"  representation agreement (A∩B Jaccard@k): "
+              f"{bundle['consistency']['mean_jaccard']} "
+              f"over {bundle['consistency']['n_compared']} episode(s)")
+    for w in bundle.get("written", []):
+        print(f"  wrote: {w}")
+
+
+def cmd_eval_retrieval(args):
+    """Retrieval benchmark: leave-video-out, confound + positive controls."""
+    from .eval_retrieval import run_eval
+    run_eval(args.reference, n_query=args.n_query, k=args.k, seed=args.seed)
+
+
 def cmd_benchmark(args):
     from .benchmark import run as run_bench
     print("MOTIONSCAPE atlas benchmark (synthetic velocity-style episodes)")
@@ -234,6 +323,8 @@ def main(argv=None):
     sv = sub.add_parser("serve", help="serve the atlas with on-demand media")
     sv.add_argument("atlas", help="atlas directory (contains index.html + data.json)")
     sv.add_argument("--episodes", default=None, help="episodes.jsonl for clip generation")
+    sv.add_argument("--reference", default=None,
+                    help="reference atlas dir: enables Find Similar upload")
     sv.add_argument("--port", type=int, default=8694)
     sv.set_defaults(fn=cmd_serve)
 
@@ -252,6 +343,46 @@ def main(argv=None):
                     help="use only human-confirmed labels for taxon context")
     it.add_argument("--n-shuffle", type=int, default=200, help="null shuffles")
     it.set_defaults(fn=cmd_interact)
+
+    br = sub.add_parser("build-reference", help="build versioned Reference Atlas Index")
+    br.add_argument("episodes", nargs="+", help="episodes.jsonl paths")
+    br.add_argument("--out", default="reference_atlas")
+    br.add_argument("--dim", type=int, default=10, help="behavior vector dimension")
+    br.add_argument("--policy", default="not-rejected",
+                    choices=["all", "not-rejected", "reviewed"])
+    br.add_argument("--min-duration-s", type=float, default=3.0)
+    br.add_argument("--require-human", action="store_true",
+                    help="only human-confirmed episodes enter the index")
+    br.add_argument("--parent", default=None, help="previous index version id")
+    br.set_defaults(fn=cmd_build_reference)
+
+    fs = sub.add_parser("find-similar", help="drop in a video, find what moves like it")
+    fs.add_argument("video")
+    fs.add_argument("--query-id", required=True)
+    fs.add_argument("--reference", required=True, help="reference atlas dir (contains index.json)")
+    fs.add_argument("--store", default=None, help="episode store for the query run")
+    fs.add_argument("--out", default=None, help="dir for query.json")
+    fs.add_argument("--atlas", default=None, help="atlas dir to inject query.json into")
+    fs.add_argument("--k", type=int, default=6)
+    fs.add_argument("--metric", default="euclidean", choices=["euclidean", "cosine"])
+    fs.add_argument("--target-fps", type=float, default=30.0)
+    fs.add_argument("--min-duration-s", type=float, default=3.0)
+    fs.add_argument("--min-area", type=int, default=None,
+                    help="detector: min component area (tiny-animal footage)")
+    fs.add_argument("--threshold", type=int, default=None,
+                    help="detector: background-difference threshold")
+    fs.add_argument("--no-morph-open", action="store_true",
+                    help="detector: skip 3x3 opening (keeps few-pixel targets)")
+    fs.add_argument("--max-gap", type=int, default=3,
+                    help="tracker: missed frames a track may bridge")
+    fs.set_defaults(fn=cmd_find_similar)
+
+    ev = sub.add_parser("eval-retrieval", help="retrieval benchmark (leave-video-out etc.)")
+    ev.add_argument("reference")
+    ev.add_argument("--n-query", type=int, default=60)
+    ev.add_argument("--k", type=int, default=6)
+    ev.add_argument("--seed", type=int, default=0)
+    ev.set_defaults(fn=cmd_eval_retrieval)
 
     b = sub.add_parser("benchmark", help="atlas scale benchmark")
     b.add_argument("--n", type=int, nargs="+", default=[1000, 5000, 10000, 20000])

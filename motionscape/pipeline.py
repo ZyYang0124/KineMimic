@@ -29,19 +29,21 @@ from .track import GreedyTracker, tracks_to_episodes
 def ingest_video(video_path: str, store: EpisodeStore, video_id: str,
                  min_duration_s: float = 3.0, px_per_cm: float | None = None,
                  environment: dict | None = None,
-                 target_fps: float = 30.0) -> list[Episode]:
+                 target_fps: float = 30.0,
+                 detector_params: dict | None = None,
+                 tracker_max_gap: int = 0) -> list[Episode]:
     """Detection + short-term tracking + episode extraction for one video.
 
     High-frame-rate footage (>30 fps) is analyzed at ``target_fps`` by
     skipping frames; episode frame indices stay in original video time, so
     clip extraction remains exact.
     """
-    det = BgDiffDetector()
+    det = BgDiffDetector(**(detector_params or {}))
     bg = det.fit_background(video_path)
     cap = cv2.VideoCapture(video_path)
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     skip = max(1, int(round(fps / max(target_fps, 1.0))))
-    tracker = GreedyTracker()
+    tracker = GreedyTracker(max_gap=tracker_max_gap)
     idx = 0
     while True:
         ok, frame = cap.read()
@@ -55,7 +57,9 @@ def ingest_video(video_path: str, store: EpisodeStore, video_id: str,
     episodes = tracks_to_episodes(tracker.tracks, video_id, video_path, fps,
                                   min_duration_s=min_duration_s, px_per_cm=px_per_cm)
     prov = Provenance(software_version=__version__, model_name=DET_MODEL, model_version="1",
-                      parameters=dict(min_duration_s=min_duration_s, n_tracks=len(tracker.tracks)))
+                      parameters=dict(min_duration_s=min_duration_s, n_tracks=len(tracker.tracks),
+                                      detector_params=detector_params or {},
+                                      tracker_max_gap=tracker_max_gap))
     for ep in episodes:
         ep.processing_history.append(prov.to_dict())
         if environment:
