@@ -1,10 +1,18 @@
 # MOTIONSCAPE — An atlas of animal movement
 
-MOTIONSCAPE is an **explorable atlas of animal movement**: real movement
-episodes, computationally characterized, organized into a space you walk
-into and explore — the way bird-call projects let people explore the
-structure of sound. Behavioral analysis exists to keep the atlas
-scientifically honest.
+MOTIONSCAPE is an **explorable atlas of animal movement** growing into
+an atlas of movement, interaction, and behavior:
+
+```
+Movement     how does one animal move?               — episodes, behavioral space
+Interaction  how does movement depend on others?     — scenes, pairwise context
+Behavior     how are movements organized?            — future
+```
+
+Real movement episodes, computationally characterized, organized into a
+space you walk into and explore — the way bird-call projects let people
+explore the structure of sound. Behavioral analysis exists to keep the
+atlas scientifically honest.
 
 ```
 MOTIONSCAPE
@@ -61,6 +69,7 @@ python -m motionscape ingest VIDEO.mp4 --id siteA_01 --site siteA
 python -m motionscape annotate <run>/episodes.jsonl   # human QC + labels
 python -m motionscape atlas <run>/episodes.jsonl --out <run>/atlas_v2
 python -m motionscape serve <run>/atlas_v2 --episodes <run>/episodes.jsonl
+python -m motionscape interact <run_dir>             # scenes + social context
 python -m motionscape benchmark --n 5000 10000        # scale checks
 ```
 
@@ -95,7 +104,7 @@ the movement analysis and can never serve as ground truth — the workbench
 7. **Episodes ≠ replicates.** The sampling hierarchy is stored and
    statistics must respect it.
 
-## Status (V0.2)
+## Status (V0.3)
 
 - Detection (swappable bg-diff), short-term greedy tracker, episode QC
 - 16 kinematic features; transparent machine pre-classifier (separate
@@ -111,11 +120,19 @@ the movement analysis and can never serve as ground truth — the workbench
 - Scale: canvas rendering + lazy media + exact k-d-tree neighbors;
   benchmarked to 20,000 episodes per build (~0.3 KB/episode payload);
   target ≥5,000 QC-approved real episodes next
+- **Interaction Layer V0** — SceneWindows + InteractionRecords from
+  concurrent tracks of the same video (no long-term identity), nearest-ant
+  context per Siler episode (distance/count/heading/activity), full-scene
+  synchronized playback in the atlas, with/without-ant contrasts with an
+  episode-shuffle null and a distance-response scan; proximity ≠
+  interaction, correlation ≠ causation, scene identity kept
+  (docs/INTERACTIONS.md)
 - Real data: Shamble 2017 (228 episodes, gold labels), Zeng 2023 (64
   velocity/pose episodes incl. non-mimetic control), own field video
 
 ## Roadmap
 
-Pose (foreleg-I vs antennae), behavioral grammar (motif transition
-sequences), more sites/sessions of field footage toward the 5,000-episode
-goal, UMAP as an alternative (still-blind) space.
+Interaction V1 (lagged coupling, synchrony nulls), Interaction Space +
+Dictionary (V2), pose-level interaction (V3), behavioral grammar, more
+sites/sessions of field footage toward the 5,000-episode goal, UMAP as an
+alternative (still-blind) space.

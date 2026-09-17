@@ -115,11 +115,14 @@ def cmd_serve(args):
 
 def cmd_atlas(args):
     from .store import EpisodeStore as ES
+    from .interaction import load_summary
     eps = ES.read_episodes(args.episodes)
     sfile = Path(args.episodes).parent / "summary.json"
     s = json.loads(sfile.read_text(encoding="utf-8")) if sfile.exists() else {}
-    out = build_atlas(eps, args.out, summary=s or None)
-    print(f"atlas: {out} ({len(eps)} episodes)")
+    ia = load_summary(Path(args.episodes).parent)
+    out = build_atlas(eps, args.out, summary=s or None, interaction=ia)
+    print(f"atlas: {out} ({len(eps)} episodes"
+          + (f", interaction: {ia['n_records']} pairs)" if ia else ")"))
     print(f"open:  python -m motionscape serve {args.out} --episodes {args.episodes}")
 
 
@@ -129,6 +132,50 @@ def cmd_viz(args):
     eps = ES.read_episodes(args.episodes)
     out = export_murmuration(eps, args.out)
     print(f"wrote {out} ({len(eps)} episodes)")
+
+
+def cmd_interact(args):
+    """Interaction Layer V0: scene windows, pairwise geometry, nearest-ant
+    context, Siler with/without-ant comparison (with shuffle null)."""
+    from pathlib import Path as _P
+    import json as _json
+    from .interaction import analyze_run, write_outputs
+    from .store import EpisodeStore as ES
+    p = _P(args.episodes)
+    run_dir = p.parent if p.suffix == ".jsonl" else p
+    eps = ES.read_episodes(p if p.suffix == ".jsonl" else p / "episodes.jsonl")
+    result = analyze_run(eps, window_s=args.window_s, stride_s=args.stride_s,
+                         radius=args.radius,
+                         require_human_labels=args.require_human,
+                         n_shuffle=args.n_shuffle)
+    out = write_outputs(run_dir, result)
+    print(f"interaction analysis: {run_dir}")
+    print(f"  concurrent pairs:    {len(result['records'])}")
+    print(f"  scene windows:       {len(result['windows'])}")
+    print(f"  episodes with scene: {len(result['contexts'])}"
+          f"  (velocity-only excluded: {result['n_velocity_excluded']})")
+    print(f"  videos w/ concurrency: {result['n_videos_with_concurrency']}")
+    cmp_ = result["comparison"]
+    if "speed" in cmp_:
+        s = cmp_["speed"]
+        print(f"  Siler speed median  with ants: {s['median_with_ant']}  "
+              f"without: {s['median_without_ant']}  (p_perm={s.get('p_perm')})")
+    if "d_ant" in cmp_ and "median_with_ant" in cmp_["d_ant"]:
+        d = cmp_["d_ant"]
+        print(f"  D_ant median        with ants: {d['median_with_ant']}  "
+              f"without: {d['median_without_ant']}  (p_perm={d.get('p_perm')})")
+    for row in cmp_.get("response", []):
+        parts = [f"radius {row['radius']}: n {row['n_with']}/{row['n_without']}"]
+        for m in ("speed", "turning", "stop_go", "d_ant"):
+            if m in row:
+                e = row[m]
+                parts.append(f"{m} Δ {e['observed_median_diff']} (p={e['p_perm']})")
+        print("  response | " + " · ".join(parts))
+    if "speed" not in cmp_ and "response" not in cmp_:
+        print("  Siler x ant comparison: not enough annotated episodes in both contexts")
+    print(f"  note: {result['provenance']['parameters']['labels_note']}")
+    print(f"  next: python -m motionscape atlas {run_dir / 'episodes.jsonl'} "
+          f"--out {run_dir / 'atlas_v2'}  (Interaction Mode appears automatically)")
 
 
 def cmd_benchmark(args):
@@ -194,6 +241,17 @@ def main(argv=None):
     v.add_argument("episodes")
     v.add_argument("--out", default="murmuration.html")
     v.set_defaults(fn=cmd_viz)
+
+    it = sub.add_parser("interact", help="Interaction Layer V0: scenes + pairwise context")
+    it.add_argument("episodes", help="run directory or episodes.jsonl")
+    it.add_argument("--window-s", type=float, default=2.0, help="scene window length (s)")
+    it.add_argument("--stride-s", type=float, default=1.0, help="scene window stride (s)")
+    it.add_argument("--radius", type=float, default=None,
+                    help="neighbor radius (cm if calibrated, else px; default 200)")
+    it.add_argument("--require-human", action="store_true",
+                    help="use only human-confirmed labels for taxon context")
+    it.add_argument("--n-shuffle", type=int, default=200, help="null shuffles")
+    it.set_defaults(fn=cmd_interact)
 
     b = sub.add_parser("benchmark", help="atlas scale benchmark")
     b.add_argument("--n", type=int, nargs="+", default=[1000, 5000, 10000, 20000])

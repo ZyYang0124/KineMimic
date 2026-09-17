@@ -68,6 +68,21 @@ log is idempotent and order-respecting (latest wins); corrections are new
 records, never edits. `annotation.apply_log` replays it before analysis;
 the workbench writes one record per keystroke.
 
+## Interaction Layer (V0)
+
+Layer 2 above movement: `SceneWindow` (sliding window of one video with
+all active episodes; configurable window/stride) and `InteractionRecord`
+(pairwise geometry of concurrent tracks: distance, bearing, heading
+difference, alignment, closing rate, speeds; explicit px/cm units). Only
+same-video + same-site episodes with xy trajectories are grouped;
+velocity-only episodes are excluded. Per-episode ant context (nearest-ant
+distance, count within radius, local ant heading/activity) feeds the
+Siler with/without-ant contrasts, an episode-shuffle null, a
+distance-response scan, and D_ant (distance to the ant feature-space
+distribution). Proximity ≠ interaction; correlation ≠ causation; outputs
+in `interactions.jsonl` / `scene_windows.jsonl` / `interaction_summary.json`
+with full provenance. See docs/INTERACTIONS.md.
+
 ## Sampling hierarchy (anti-pseudo-replication)
 
 Site → Session → Video → Episode is stored explicitly (site_id,

@@ -77,6 +77,18 @@ TEMPLATE = r"""<!DOCTYPE html>
  .fprow .fill{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:#4fd1c5}
  .fprow.future .fill{background:#2a3a4a}
  .tabbar{display:flex;gap:6px;margin:10px 0;flex-wrap:wrap}
+ .modeseg{display:flex;gap:0;margin-right:6px}
+ .modeseg .btn{border-radius:0;border-right-width:0}
+ .modeseg .btn:first-child{border-radius:18px 0 0 18px}
+ .modeseg .btn:last-child{border-radius:0 18px 18px 0;border-right-width:1px}
+ .modeseg .btn.on{background:#1b3a44;color:#c8f2ec}
+ .scenewrap{position:relative;margin:6px 0}
+ .scenewrap img,.scenewrap canvas.clipcv{width:100%;display:block;border-radius:8px;background:#04070b}
+ .scenewrap canvas.overlay{position:absolute;inset:0;width:100%;height:100%}
+ .ctxline{margin:6px 0;padding:7px 10px;border:1px solid #22404a;border-radius:8px;font-size:12px;color:#b8d8d2;background:#0b141c}
+ table.cmp{border-collapse:collapse;font-size:12px;width:100%;margin:6px 0}
+ table.cmp td,table.cmp th{border-bottom:1px solid #131d27;padding:4px 6px;text-align:right}
+ table.cmp th:first-child,table.cmp td:first-child{text-align:left;color:#8fa8bc}
  input.txt,textarea.txt{width:100%;background:#0e1a22;border:1px solid #2a4a55;color:var(--ink);
    border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit}
  .fps{position:fixed;right:12px;bottom:10px;font-size:10px;color:#3a4a5a;z-index:4}
@@ -100,6 +112,9 @@ TEMPLATE = r"""<!DOCTYPE html>
  <div id="brand">MOTIONSCAPE<small>an atlas of animal movement · The Murmur</small></div>
  <div id="dataset"></div>
  <div class="sp"></div>
+ <div class="modeseg" id="modeseg" style="display:none">
+  <button class="btn on" id="modeM">◉ Movement</button><button class="btn" id="modeI">⇄ Interaction</button>
+ </div>
  <button class="btn" id="exploreBtn">☰ Explore</button>
  <button class="btn primary" id="revealBtn">✦ Reveal species</button>
 </header>
@@ -126,6 +141,7 @@ TEMPLATE = r"""<!DOCTYPE html>
 /* ================= data ================= */
 let META=null, EP=[], IDX={}, serverMode=false;
 let revealed=false, revealT=0, sel=-1, motifSel=-1, T=0;
+let mode='movement', contextShade=false;
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const COLORS={ant:"#e8a13c",mimic:"#4fd1c5",siler:"#4fd1c5",other_spider:"#b794f4",
               other_arthropod:"#a0aec0",unknown:"#718096"};
@@ -150,8 +166,21 @@ function boot(d){
  scaleEmbeddings();
  document.getElementById('dataset').textContent=
    `${META.n_episodes.toLocaleString()} movements · ${META.hierarchy.n_videos} videos · ${META.hierarchy.n_sites} site(s) · build ${META.build_seconds}s`;
+ if(META.interaction&&META.interaction.available){
+   document.getElementById('modeseg').style.display='flex';
+   document.getElementById('modeI').onclick=()=>setMode('interaction');
+   document.getElementById('modeM').onclick=()=>setMode('movement');
+ }
  hero();
  requestAnimationFrame(draw);
+}
+function setMode(m){
+ mode=m;
+ document.getElementById('modeM').classList.toggle('on',m==='movement');
+ document.getElementById('modeI').classList.toggle('on',m==='interaction');
+ document.getElementById('blindnote').innerHTML = m==='interaction'
+   ? '<b>Interaction view.</b> Hollow Siler particles = <b>no ants nearby</b> during the episode; filled = ants within the analysis radius. Reveal species to see it. Click any particle for its full scene.'
+   : '<b>1 particle = 1 real movement episode.</b> Position = behavioral similarity, drift = the episode\'s own path through movement space, quiver = intermittency. <span id="blindline">This space was built without knowing what any animal is — only how it moves.</span>';
 }
 /* embed PCA coords -> [0..1]^2 (padded), deterministic across builds */
 function scaleEmbeddings(){
@@ -246,8 +275,17 @@ function draw(){
    const inFocus=(motifSel<0||e.m===motifSel);
    const a=i===sel?1:(inFocus?0.82:0.07);
    cx.globalAlpha=a;
-   cx.fillStyle=i===sel?'#ffffff':col(e,revealT);
-   cx.beginPath();cx.arc(x,y,(i===sel?7:3.6)*DPR,0,7);cx.fill();
+   const shade=(mode==='interaction'||contextShade)&&revealed&&e.ia&&
+               (e.l==='siler'||e.l==='mimic');
+   if(i===sel){cx.fillStyle='#ffffff';cx.beginPath();cx.arc(x,y,7*DPR,0,7);cx.fill();}
+   else if(shade&&!e.ia.ha){          // hollow: no ants nearby (data, not style)
+     cx.strokeStyle=col(e,revealT);cx.lineWidth=1.6*DPR;
+     cx.beginPath();cx.arc(x,y,3.8*DPR,0,7);cx.stroke();
+   }
+   else{
+     cx.fillStyle=i===sel?'#ffffff':col(e,revealT);
+     cx.beginPath();cx.arc(x,y,(i===sel?7:3.6)*DPR,0,7);cx.fill();
+   }
    if(i===sel){cx.strokeStyle=col(e,revealT);cx.lineWidth=2*DPR;
      cx.beginPath();cx.arc(x,y,11*DPR,0,7);cx.stroke();}
  }
@@ -296,9 +334,19 @@ function labelChip(e){
  if(!revealed)return `<span class="lbl" style="color:#8fa8bc">movement</span>`;
  return `<span class="lbl" style="color:${COLORS[e.l]}">${NAMES[e.l]||e.l}</span>`;
 }
+function ctxText(c){
+ if(!c)return null;
+ if(!c.has_ant)return `Alone — no ants within ${Math.round(c.radius)} ${c.units} during this episode`;
+ return `Ants nearby — mean ${c.n_ants_mean} within ${Math.round(c.radius)} ${c.units}`+
+   (c.nearest_ant_dist_min!=null?` · nearest ${c.nearest_ant_dist_min} ${c.units} at closest`:'')+
+   (c.ant_activity_mean!=null?` · local ant activity ${c.ant_activity_mean} ${c.units}/s`:'');
+}
 function showMovement(e,m){
  const nn=(m.neighbors||[]);
  const other=nn.find(n=>revealed&&n.label!==e.l)||null;
+ const ct=ctxText(m.context);
+ const contrast=nn.find(n=>{const ne=IDX[n.episode_id];
+   return ne&&ne.ia&&m.context&&ne.ia.ha!==((m.context.has_ant)?1:0);});
  panel.innerHTML=`
   <div style="display:flex;align-items:center;gap:8px">
    ${labelChip(e)}
@@ -306,72 +354,135 @@ function showMovement(e,m){
    <span class="sp" style="flex:1"></span>
    <button class="btn" style="padding:3px 10px" onclick="closePanel()">esc</button></div>
   <div class="muted">${m.species_detail?'· '+m.species_detail+' · ':''}${m.video_id} · frames ${m.frames[0]}–${m.frames[1]}${m.sampling.site?' · '+esc(m.sampling.site):''}</div>
-  <div id="clipwrap"><img class="clip" id="mainclip" alt="movement clip"></div>
+  ${ct?`<div class="ctxline">⇄ <b>Social context:</b> ${ct}</div>`:''}
+  <div class="scenewrap"><img class="clip" id="mainclip" alt="movement clip"></div>
   <div class="muted">speed / turn / moving — real time series (replay below is the real trajectory, time-normalized)</div>
-  <div id="rows">${sparkRow('speed','#4fd1c5')}${sparkRow('turn','#e8a13c')}${sparkRow('moving','#b794f4')}</div>
-  <div style="display:flex;gap:8px;margin:8px 0">
+  <div id="rows">${sparkRow('speed','#4fd1c5')}${sparkRow('turn','#e8a13c')}${sparkRow('moving','#b794f4')}${
+    m.scene?sparkRow('nearest ant','#e8a13c')+sparkRow('ants in radius','#b794f4'):''}</div>
+  <div style="display:flex;gap:8px;margin:8px 0;flex-wrap:wrap">
     <button class="btn" id="playBtn" style="padding:4px 14px">⏸ pause</button>
-    ${nn.length?`<button class="btn" onclick="compare()">⇄ compare with nearest movement${revealed&&other?' (nearest '+(NAMES[other.label]||other.label).split(' ')[0]+')':''}</button>`:''}
+    ${nn.length?`<button class="btn" onclick="compare()">⇄ compare nearest</button>`:''}
+    ${contrast?`<button class="btn" onclick="compareWith('${contrast.episode_id}')">⇄ compare: same movement, ${contrast.ia&&contrast.ia.ha?'with':'without'} ants</button>`:''}
   </div>
   <div style="margin-top:6px;color:var(--accent)">Similar movements <span class="muted">— nearest in ${META.features.length}-D feature space, not screen distance</span></div>
   <div id="nnlist">${nn.map((n,k)=>{
      const ne=IDX[n.episode_id]||{};
      const name=revealed?`<span class="lbl" style="color:${COLORS[ne.l]}">${NAMES[ne.l]||ne.l}</span>`
                         :`<span class="lbl" style="color:#8fa8bc">Movement ${k+1}</span>`;
+     const ctx2=revealed&&ne.ia?` · ${ne.ia.ha?'ants near':'no ants'}`:'';
      return `<div class="nbr" onclick="showById('${n.episode_id}')">
        <canvas width="192" height="120" data-traj="${n.episode_id}"></canvas>
-       <div>${name}<div class="muted">similarity ${n.similarity.toFixed(2)} · ${(ne.d||0).toFixed(1)}s</div></div></div>`;
+       <div>${name}<div class="muted">similarity ${n.similarity.toFixed(2)} · ${(ne.d||0).toFixed(1)}s${ctx2}</div></div></div>`;
    }).join('')}</div>
   <div class="muted" style="margin-top:8px">Provenance — every claim traces back here</div>
   <div class="prov">${esc(m.provenance_chain.join('\n'))}</div>`;
  openPanel();
  // clip: real video when served; graceful in-browser replay otherwise
  const img=panel.querySelector('#mainclip');
- if(serverMode&&m.clip_kind==='video'){img.src=`clip/${e.id}.gif`;img.onerror=()=>replayFallback(img,m,e);}
- else replayFallback(img,m,e);
+ let mainCv=null;
+ if(serverMode&&m.clip_kind==='video'){img.src=`clip/${e.id}.gif`;img.onerror=()=>{mainCv=replayFallback(img,m,e);};}
+ else mainCv=replayFallback(img,m,e);
  drawSeries(m);
- startSyncReplay([m],[panel.querySelector('#rows')],panel.querySelector('#playBtn'));
+ if(m.scene){
+   // full-scene overlay: focal + concurrent animals, from the same source video
+   const ov=document.createElement('canvas');ov.className='overlay';ov.width=720;ov.height=400;
+   panel.querySelector('.scenewrap').appendChild(ov);
+   m._sceneCv=ov;
+   if(revealed)markNeighbors(m);
+ }
+ startSyncReplay([m],[panel.querySelector('#rows')],panel.querySelector('#playBtn'),
+   prog=>{if(m.scene&&m._sceneCv)drawScene(m._sceneCv,m,prog,revealed);});
  nn.forEach(n=>{const ne=IDX[n.episode_id];if(ne)fetchMeta(n.episode_id).then(nm=>{
     if(!nm)return;const c=panel.querySelector(`canvas[data-traj="${n.episode_id}"]`);
     if(c)drawStaticReplay(c,nm.trajectory||[],revealed?(COLORS[ne.l]||'#4fd1c5'):'#56677a');});});
 }
+function markNeighbors(m){
+ // re-tint scene thumbnails/legend after reveal — handled by drawScene colors
+ if(m._sceneCv)drawScene(m._sceneCv,m,0,true);
+}
+/* full-scene overlay: real trajectories of all concurrent animals,
+   revealed up to the shared playhead. Colors = species (post-reveal). */
+function drawScene(c,m,prog,showLabels){
+ const g=c.getContext('2d');g.clearRect(0,0,c.width,c.height);
+ if(!m.trajectory||m.trajectory.length<2)return;
+ let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+ m.trajectory.forEach(p=>{x0=Math.min(x0,p[0]);x1=Math.max(x1,p[0]);y0=Math.min(y0,p[1]);y1=Math.max(y1,p[1]);});
+ (m.scene.neighbors||[]).forEach(nb=>{
+   (showLabels?([COLORS[nb.label]||'#56677a']):['#56677a']).forEach(col2=>{
+     g.strokeStyle=col2;g.lineWidth=2;g.globalAlpha=.85;g.beginPath();
+     let started=false;
+     nb.frames.forEach((f,k)=>{
+       const curf=m.frames[0]+prog*(m.frames[1]-m.frames[0]);
+       if(f>curf)return;
+       const px=16+(nb.xs[k]-x0)/(x1-x0+1e-9)*(c.width-32);
+       const py=c.height-16-(nb.ys[k]-y0)/(y1-y0+1e-9)*(c.height-32);
+       started?g.lineTo(px,py):g.moveTo(px,py);started=true;});
+     g.stroke();g.globalAlpha=1;});
+ });
+ // focal trajectory up to playhead, white
+ const curf=m.frames[0]+prog*(m.frames[1]-m.frames[0]);
+ g.strokeStyle='#ffffff';g.lineWidth=3;g.beginPath();let st=false;
+ m.trajectory.forEach((p,k)=>{const f=m.frames[0]+(k/(m.trajectory.length-1))*(m.frames[1]-m.frames[0]);
+   if(f>curf)return;const px=16+(p[0]-x0)/(x1-x0+1e-9)*(c.width-32);
+   const py=c.height-16-(p[1]-y0)/(y1-y0+1e-9)*(c.height-32);st?g.lineTo(px,py):g.moveTo(px,py);st=true;});
+ g.stroke();
+ const last=m.trajectory[Math.max(0,Math.min(m.trajectory.length-1,
+   Math.round((curf-m.frames[0])/(m.frames[1]-m.frames[0])*(m.trajectory.length-1))))];
+ if(last){const px=16+(last[0]-x0)/(x1-x0+1e-9)*(c.width-32);
+   const py=c.height-16-(last[1]-y0)/(y1-y0+1e-9)*(c.height-32);
+   g.fillStyle='#fff';g.beginPath();g.arc(px,py,5,0,7);g.fill();}
+}
 function replayFallback(img,m,e){
  // in-browser trajectory replay (the real path; used when no server media).
  // startSyncReplay picks this canvas up and animates it on the shared clock.
- const c=document.createElement('canvas');c.className='clip';c.width=720;c.height=400;
+ const c=document.createElement('canvas');c.className='clip clipcv';c.width=720;c.height=400;
  img.replaceWith(c);
+ return c;
 }
 function sparkRow(lab,c){
  return `<div class="rowwrap"><span class="rowlab">${lab}</span><div>
    <canvas class="spark" width="640" height="80" data-lab="${lab}" data-c="${c}"></canvas></div></div>`;}
+function sparkArr(m,lab){
+ if(lab==='nearest ant')return (m.scene&&m.scene.nearest_ant_dist||[]).map(v=>v==null?NaN:v);
+ if(lab==='ants in radius')return (m.scene&&m.scene.n_ants_within||[]);
+ return (m.series||{})[lab]||[0];}
 function drawSeries(m){
  panel.querySelectorAll('canvas.spark').forEach(c=>{
-   const arr=(m.series||{})[c.dataset.lab]||[0];c._arr=arr;
-   const g=c.getContext('2d'),mx=Math.max(...arr,1e-9);
-   g.clearRect(0,0,c.width,c.height);g.strokeStyle=c.dataset.c;g.lineWidth=2.5;g.beginPath();
-   arr.forEach((v,i)=>{const x=i/(arr.length-1||1)*c.width,y=c.height-6-(v/mx)*(c.height-12);
-     i?g.lineTo(x,y):g.moveTo(x,y);});g.stroke();});
+   const arr=sparkArr(m,c.dataset.lab);c._arr=arr;
+   const g=c.getContext('2d');g.clearRect(0,0,c.width,c.height);
+   const vs=arr.filter(v=>v!=null&&isFinite(v));
+   const mx=Math.max(...vs,1e-9);
+   g.strokeStyle=c.dataset.c;g.lineWidth=2.5;g.beginPath();let st=false;
+   arr.forEach((v,i)=>{if(v==null||!isFinite(v)){st=false;return;}
+     const x=i/(arr.length-1||1)*c.width,y=c.height-6-(v/mx)*(c.height-12);
+     st?g.lineTo(x,y):g.moveTo(x,y);st=true;});
+   g.stroke();});
 }
 /* synchronized replay: shared playhead across trajectory canvas + sparklines */
-function startSyncReplay(metas,rowsEls,playBtn){
+function startSyncReplay(metas,rowsEls,playBtn,onFrame){
  let playing=true,t0=performance.now(),prog=0;
  const dur=Math.max(metas[0].duration_s,1)*1000;
  const rowsEl=rowsEls&&rowsEls[0];
  if(playBtn)playBtn.onclick=()=>{playing=!playing;
    if(playing)t0=performance.now()-prog*dur;
    playBtn.textContent=playing?'⏸ pause':'▶ play';};
- const mainCv=panel.querySelector('.clip canvas');
+ const mainCv=panel.querySelector('.clip canvas.clipcv')||panel.querySelector('.scenewrap .overlay');
  function frame(now){
    if(!rowsEl||!document.contains(rowsEl))return;   // panel replaced → stop
    if(playing)prog=((now-t0)/dur)%1;
-   if(mainCv&&document.contains(mainCv))
-     drawReplayProgress(mainCv,metas[0].trajectory||[],prog,revealed?(COLORS[metas[0].label]||'#4fd1c5'):'#4fd1c5');
+   const trajCv=panel.querySelector('.clip canvas.clipcv');
+   if(trajCv&&document.contains(trajCv))
+     drawReplayProgress(trajCv,metas[0].trajectory||[],prog,revealed?(COLORS[metas[0].label]||'#4fd1c5'):'#4fd1c5');
+   if(onFrame)onFrame(prog);
    panel.querySelectorAll('canvas.spark').forEach(c=>{
      const arr=c._arr||[0];const g=c.getContext('2d');
-     const mx=Math.max(...arr,1e-9);g.clearRect(0,0,c.width,c.height);
-     g.strokeStyle=c.dataset.c;g.lineWidth=2.5;g.beginPath();
-     arr.forEach((v,i)=>{const x=i/(arr.length-1||1)*c.width,y=c.height-6-(v/mx)*(c.height-12);
-       i?g.lineTo(x,y):g.moveTo(x,y);});g.stroke();
+     const vs=arr.filter(v=>v!=null&&isFinite(v));
+     const mx=Math.max(...vs,1e-9);g.clearRect(0,0,c.width,c.height);
+     g.strokeStyle=c.dataset.c;g.lineWidth=2.5;g.beginPath();let st=false;
+     arr.forEach((v,i)=>{if(v==null||!isFinite(v)){st=false;return;}
+       const x=i/(arr.length-1||1)*c.width,y=c.height-6-(v/mx)*(c.height-12);
+       st?g.lineTo(x,y):g.moveTo(x,y);st=true;});
+     g.stroke();
      const px=prog*c.width;g.strokeStyle='#ffffff88';g.beginPath();g.moveTo(px,0);g.lineTo(px,c.height);g.stroke();});
    requestAnimationFrame(frame);
  }
@@ -403,21 +514,24 @@ window.closePanel=function(){panel.classList.remove('open');sel=-1;};
 window.showById=showById;
 
 /* ================= side-by-side synchronized comparison ================= */
-window.compare=async function(){
+window.compareWith=async function(targetId){
  if(sel<0)return;
  const e=EP[sel];const m=await fetchMeta(e.id);if(!m)return;
- const nb=(m.neighbors||[])[0];if(!nb)return;
- const m2=await fetchMeta(nb.episode_id);if(!m2)return;
- const e2=IDX[nb.episode_id];
+ const tid=targetId||((m.neighbors||[])[0]||{}).episode_id;
+ if(!tid)return;
+ const m2=await fetchMeta(tid);if(!m2)return;
+ const e2=IDX[tid];
+ const nb=((m.neighbors||[]).find(n=>n.episode_id===tid))||{similarity:0,dist:0};
  const nameOf=x=>revealed?`<span class="lbl" style="color:${COLORS[x.l]}">${NAMES[x.l]||x.l}</span>`
                          :`<span class="lbl" style="color:#8fa8bc">movement</span>`;
+ const ctxOf=mm=>{const c=ctxText(mm.context);return c?`<div class="ctxline" style="font-size:11px">${c}</div>`:'';};
  panel.innerHTML=`
   <div style="display:flex;align-items:center;gap:8px">
     <button class="btn" style="padding:3px 10px" onclick="showById('${e.id}')">← back</button>
     <span class="muted">side-by-side · each at its own real pace · shared playhead</span></div>
   <div class="split" style="margin-top:10px">
-   <div>${nameOf(e)}<div class="muted">${e.d.toFixed(1)}s</div><img class="clip" id="cmpA"></div>
-   <div>${nameOf(e2)}<div class="muted">${e2.d.toFixed(1)}s</div><img class="clip" id="cmpB"></div>
+   <div>${nameOf(e)}<div class="muted">${e.d.toFixed(1)}s</div><img class="clip" id="cmpA">${ctxOf(m)}</div>
+   <div>${nameOf(e2)}<div class="muted">${e2.d.toFixed(1)}s</div><img class="clip" id="cmpB">${ctxOf(m2)}</div>
   </div>
   <div class="muted">A vs B — similarity ${(nb.similarity).toFixed(2)} in feature space (d=${nb.dist.toFixed(2)}).
    Watch the same playhead: where the speeds and paths agree, that is what “similar” means.</div>
@@ -492,11 +606,14 @@ function showRegion(near){
  });
 }
 
+window.compare=function(){return compareWith();};
+
 /* ================= explore drawer ================= */
 document.getElementById('exploreBtn').onclick=()=>{showExplore('dictionary');};
 function tab(name,active){
- return `<span class="chip ${active?'on':''}" onclick="showExplore('${name}')">${
-   {dictionary:'☰ Motion Dictionary',fingerprint:'⌇ Mimicry fingerprint',river:'≈ Behavior River',data:'⌸ Data & provenance'}[name]}</span>`;}
+ const names={dictionary:'☰ Motion Dictionary',fingerprint:'⌇ Mimicry fingerprint',
+   river:'≈ Behavior River',interaction:'⇄ Interaction',data:'⌸ Data & provenance'};
+ return `<span class="chip ${active?'on':''}" onclick="showExplore('${name}')">${names[name]}</span>`;}
 window.showExplore=function(tabName){
  openPanel();
  renderExplore(tabName);
@@ -506,7 +623,45 @@ function renderExplore(tabName){
  if(tabName==='dictionary')return renderDictionary();
  if(tabName==='fingerprint')return renderFingerprint();
  if(tabName==='river')return renderRiver();
+ if(tabName==='interaction')return renderInteraction();
  if(tabName==='data')return renderData();
+}
+function tabbar(active){
+ let t=tab('dictionary',active==='dictionary')+tab('fingerprint',active==='fingerprint')
+      +tab('river',active==='river');
+ if(META.interaction&&META.interaction.available)
+   t+=tab('interaction',active==='interaction');
+ return t+tab('data',active==='data');
+}
+function renderInteraction(){
+ const I=META.interaction||{available:false};
+ const cmp=I.comparison||{};
+ const rows=(cmp.response||[]);
+ panel.innerHTML=`
+  <h1>Interaction — Siler × Ant</h1>
+  <div class="tabbar">${tabbar('interaction')}</div>
+  <div class="muted">Does Siler movement depend on the presence of ants?
+   Contrasts below compare Siler episodes <b>with ants nearby</b> vs <b>without</b>
+   (within the analysis radius), with an episode-shuffle null. These are
+   <b>descriptive, predictive associations — not causal effects</b>; proximity is not interaction.</div>
+  ${rows.length?`<table class="cmp"><tr><th>radius</th><th>n with/without</th>${rows[0].speed?'<th>speed Δ</th><th>p</th>':''}${rows[0].d_ant?'<th>D_ant Δ</th><th>p</th>':''}</tr>
+   ${rows.map(r=>`<tr><td>${r.radius}${r.n_with!==undefined?'':''}</td><td>${r.n_with} / ${r.n_without}</td>
+     ${r.speed?`<td>${r.speed.observed_median_diff}</td><td>${r.speed.p_perm}</td>`:''}
+     ${r.d_ant?`<td>${r.d_ant.observed_median_diff}</td><td>${r.d_ant.p_perm}</td>`:''}</tr>`).join('')}
+  </table>
+  <div class="muted">Δ = median(with ants) − median(without). p = episode-shuffle permutation p.
+   Distance-response across radii guards against one arbitrary threshold.</div>`
+  :`<div class="muted">Not enough episodes in both contexts yet — annotate more Siler episodes (workbench) and re-run <b>motionscape interact</b>.</div>`}
+  ${cmp.d_ant&&cmp.d_ant.note?`<div class="muted" style="margin-top:8px">${esc(cmp.d_ant.note)}</div>`:''}
+  <div class="ctxline" style="margin-top:10px"><b>View:</b> Interaction mode shades Siler particles by their real social context —
+   hollow = no ants nearby during the episode (from the same source video).</div>
+  <button class="btn" id="shadeBtn" style="margin:6px 0">${contextShade?'◌ stop shading':'◌ shade Siler by ant context'}</button>
+  <div class="prov">${esc(((I.provenance||{}).parameters||{}).labels_note||'')}
+\npairs: ${I.n_pairs} · scene windows: ${I.n_scene_windows}${I.n_velocity_excluded?` · velocity-only episodes excluded: ${I.n_velocity_excluded}`:''}</div>`;
+ panel.querySelector('#shadeBtn').onclick=function(){
+   contextShade=!contextShade;
+   this.textContent=contextShade?'◌ stop shading':'◌ shade Siler by ant context';
+ };
 }
 function renderDictionary(){
  const counts={};EP.forEach(e=>counts[e.m]=(counts[e.m]||0)+1);
@@ -520,7 +675,7 @@ function renderDictionary(){
   <h1>Motion Dictionary</h1>
   <div class="muted">Motifs are discovered by the machine (k-means in feature space).
    They have numbers, not names — naming is a human act, after watching.</div>
-  <div class="tabbar">${tab('dictionary',1)}${tab('fingerprint',0)}${tab('river',0)}${tab('data',0)}</div>
+  <div class="tabbar">${tabbar('dictionary')}</div>
   <div style="margin:6px 0">${motifs.map(m=>`<span class="chip ${m===sel_m?'on':''}" onclick="motifClick(${m})">M${m} · ${counts[m]}</span>`).join('')}</div>
   <div style="margin:10px 0 4px;color:var(--accent);font-size:15px">M${sel_m} ${humanAnn?`— “${esc(humanAnn.name)}” <span class="muted">(${esc(humanAnn.annotator)})</span>`:''}</div>
   <div style="display:flex;gap:6px;margin:8px 0">
@@ -568,7 +723,7 @@ function renderFingerprint(){
   <h1>Behavioral Mimicry Fingerprint</h1>
   <div class="muted">Per-dimension overlap (Bhattacharyya coefficient, 0–1) between Siler and ant
    episode distributions. <b style="color:#8fa8bc">Deliberately not one number</b> — mimicry is a profile, not a score.</div>
-  <div class="tabbar">${tab('dictionary',0)}${tab('fingerprint',1)}${tab('river',0)}${tab('data',0)}</div>
+  <div class="tabbar">${tabbar('fingerprint')}</div>
   ${!revealed?`<div class="muted" style="margin:10px 0">This panel describes specific animals — press <b>Reveal species</b> first.</div>`:
   Object.entries(fp).length?Object.entries(fp).map(([d,v])=>`
     <div class="fprow"><span class="name">${FP_DIM_NAMES[d]||d}</span>
@@ -587,7 +742,7 @@ function renderFingerprint(){
 function renderRiver(){
  panel.innerHTML=`
   <h1>Behavior River</h1>
-  <div class="tabbar">${tab('dictionary',0)}${tab('fingerprint',0)}${tab('river',1)}${tab('data',0)}</div>
+  <div class="tabbar">${tabbar('river')}</div>
   ${!revealed?'<div class="muted" style="margin:10px 0">The river flows in species colors — press <b>Reveal species</b> first.</div>':''}
   <canvas id="river" width="760" height="240" style="width:100%;background:#0c141c;border-radius:8px"></canvas>
   <div class="muted">Species movement volume across the day (hour of day when timestamps exist).
@@ -616,7 +771,7 @@ function renderData(){
  const h=META.hierarchy,tree=h.tree||{};
  panel.innerHTML=`
   <h1>Data & provenance</h1>
-  <div class="tabbar">${tab('dictionary',0)}${tab('fingerprint',0)}${tab('river',0)}${tab('data',1)}</div>
+  <div class="tabbar">${tabbar('data')}</div>
   <div class="muted">Sampling hierarchy — episodes are <b>not</b> independent replicates. Statistics must
    respect site → session → video → episode (hierarchical bootstrap / mixed models).</div>
   <div style="margin:8px 0;font-size:12px">

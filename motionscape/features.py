@@ -36,8 +36,8 @@ def trajectory_features(centroids: list[list[float]], fps: float,
     step0 = int(np.bincount(steps_[steps_ > 0]).argmax()) if (steps_ > 0).any() else 1
     dt0 = step0 / (fps or 30.0)
 
-    scale = px_per_cm if px_per_cm else 1.0  # px -> cm
-    xy_c = xy * scale
+    scale = px_per_cm if px_per_cm else 1.0  # px_per_cm: pixels per cm -> divide
+    xy_c = xy / scale
     # frame spacing: 1 for native tracking, N when high-fps video was analyzed
     # with frame skipping (frames stay in original video time)
     steps = np.diff(fr)
