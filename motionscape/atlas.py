@@ -302,6 +302,19 @@ def build_atlas(episodes: list[Episode], out_dir: str | Path,
             ep.motif = int(m)
 
     labels = [ep.effective_label() for ep in episodes]
+    # biological roles (model / mimic / controls) — metadata overlay for the
+    # comparative framework; never used by encoders or the embedding
+    from .roles import RoleRegistry, ROLE_NAMES
+    registry = RoleRegistry.load(out_dir / "roles.json")
+    registry.save(out_dir / "roles.json")       # persist effective registry
+    registry.apply_to_episodes(episodes)
+    label_role = {}
+    for lbl in sorted(set(labels)):
+        rep = next(e for e in episodes if e.effective_label() == lbl)
+        taxon = (rep.bio_label_detail or {}).get("species") or lbl
+        label_role[lbl] = registry.role_for(taxon)
+    roles_meta = {lbl: {"role": role, "name": ROLE_NAMES[role]}
+                  for lbl, role in label_role.items()}
     ia = (interaction or {}).get("contexts", {})
     slim, meta_jobs = [], []
     for i, ep in enumerate(episodes):
@@ -321,6 +334,7 @@ def build_atlas(episodes: list[Episode], out_dir: str | Path,
             "ck": clip_kind(ep),
             "nn": [[int(j), round(float(nn_dist[i, r]), 3)]
                    for r, j in enumerate(nn_idx[i])],
+            "r": label_role[labels[i]],
             "ia": ({"ha": int(bool(ctx.get("has_ant"))),
                     "fw": ctx.get("frac_frames_with_ant"),
                     "nm": ctx.get("n_ants_mean"),
@@ -357,6 +371,7 @@ def build_atlas(episodes: list[Episode], out_dir: str | Path,
         "fingerprint": (summary or {}).get("mimicry_fingerprint", {}),
         "annotation": (summary or {}).get("annotation", {}),
         "interaction": _interaction_meta(interaction),
+        "roles": roles_meta,
         "motif_annotations": _load_motif_annotations(out_dir),
         "provenance": run_provenance or (summary or {}).get("provenance", {}),
         "question": "How does a spider move like an ant?",

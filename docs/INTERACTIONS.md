@@ -99,6 +99,15 @@ nearest-ant distance, ants nearby (count, mean heading, mean speed,
 activity) and the with/without contrasts below. All computed from
 trajectories — no pose, no learning model.
 
+## Role in the mimicry framework
+
+Interaction context exists to answer a mimicry question, not a general
+one: is ant-like movement **context-dependent** (Question 5 of the core
+framework)? Ant density, nearest-ant distance and local ant activity are
+the ecological variables a mimic actually experiences; comparing mimic
+episodes in ant-rich vs ant-poor moments — always against controls — is
+how contextual plasticity of behavioral mimicry will eventually be tested.
+
 ## The with/without contrast and its null
 
 For Siler episodes grouped by `has_ant` (at the analysis radius), we

@@ -7,6 +7,14 @@ The user-facing promise:
 This document explains what "moves like it" means here, exactly how each
 number is computed, and what the system refuses to claim.
 
+## What retrieval is for
+
+Retrieval locates a candidate ant mimic **within the ant-mimicry
+behavioral reference space**: the nearest ant episodes (models), nearest
+mimic episodes from independent lineages, nearest controls, and closest
+motifs. It is not a universal animal identifier, and it does not rank all
+of Animalia — the reference space is the biologically relevant one.
+
 ## What is behavioral similarity?
 
 Two episodes are behaviorally similar when their **movement descriptions**

@@ -3,6 +3,43 @@
 Every claim MOTIONSCAPE's interface makes rests on the assumptions below.
 They are stated so a reviewer can challenge any of them individually.
 
+## 0. What the project is — and is not
+
+MOTIONSCAPE studies one specific, repeatedly evolved phenomenon:
+behavioral ant mimicry across independent lineages. Its scope is bounded
+by that question. It is **not** a universal animal-movement comparator:
+taxa whose scale, locomotor apparatus, medium, and ecology differ too
+widely from the mimicry systems under study do not enter the same
+behavioral similarity space, because cross-system distances there carry
+no biological meaning.
+
+The long-term questions (all under test, none assumed):
+
+1. Do independent ant-mimic lineages converge on similar ant-like
+   movement space?
+2. In which behavioral dimensions does any convergence occur (trajectory
+   geometry, speed, turning, stop–go rhythm, pause structure, appendage
+   motion, pose, interaction responses)?
+3. Do different lineages reach mimicry through different behavioral
+   strategies?
+4. How do static (morphological) and dynamic (behavioral) mimicry
+   relate — synergistic, independent, or compensatory? (e.g. the
+   morphology↓ / behavior↑ trade-off is a working HYPOTHESIS, never a
+   UI claim.)
+5. Is behavioral mimicry context-dependent (ant-rich environments)?
+6. Where do convergence, trade-offs, and constraints appear across
+   lineages?
+
+Analysis units are **movement phenotypes and behavioral distributions**:
+one species = a cloud P(z | species), never one point. Ants are equally
+diverse (exploration, foraging, recruitment, carrying…), so the question
+is which regions of the ant behavioral distribution mimics occupy — and
+candidate "ant-like regions" must emerge from occupancy data (ant-high,
+mimic-high, control-low), never be defined a priori. A future
+**Strategy Space** (per-lineage fingerprint across trajectory / rhythm /
+turning / pose / appendage / interaction mimicry dimensions) follows the
+same rule: many roads to a similar result.
+
 ## 1. What an episode is
 
 An **episode** is one continuous, sufficiently reliable observation of one

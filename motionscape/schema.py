@@ -129,6 +129,11 @@ class Episode:
     annotation_status: str = "unreviewed"     # one of QC_STATES
     annotation_note: str = ""
 
+    # biological role in the mimicry comparison (metadata, independent of
+    # taxonomy, never used by encoders): model | mimic |
+    # phylogenetic_control | ecological_control | unknown — see roles.py
+    biological_role: Optional[str] = None
+
     # legacy combined field (v0.1): kept in sync as the *effective* label so
     # older consumers (viz.py, old runs) keep working. New code should use
     # effective_label().

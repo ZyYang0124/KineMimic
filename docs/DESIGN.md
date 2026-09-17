@@ -1,11 +1,48 @@
 # MOTIONSCAPE — Design Document
 
-## Product shape
+## Core positioning (fixed)
 
-MOTIONSCAPE / **The Murmur** / *Ant Mimicry* — an explorable atlas of
-animal movement whose first biological showcase is ant-mimicry in *Siler*
-jumping spiders. The codebase is species-agnostic: labels, importers, and
-the question string are showcase data, not architecture.
+> 用可探索的行为表型空间,研究不同拟蚁类群如何独立演化出
+> "像蚂蚁一样运动"的能力。
+> (Using an explorable behavioral phenotype space to understand how
+> ant-mimicking lineages independently evolve to move like ants.)
+
+MOTIONSCAPE / **The Murmur** / *Ant Mimicry*. The codebase is
+species-agnostic in plumbing, but the scientific scope is deliberately
+bounded: **MOTIONSCAPE is not intended to compare all animal movement in
+a single universal latent space.** It focuses on biologically comparable
+locomotor systems relevant to ant mimicry. Any proposed feature must
+answer: does this help us understand how ant-mimicking lineages
+independently evolve to move like ants? If not, it stays out of the core
+roadmap.
+
+## Biological roles (the comparative framework)
+
+Four roles structure every comparison; roles are metadata, independent
+of taxonomy, and never enter encoders or embeddings (`roles.py`):
+
+- **model** — true ants (the Ant Behavioral Reference Space);
+- **mimic** — lineages with well-supported behavioral ant mimicry,
+  tracked by `mimicry_system_id` so INDEPENDENT evolutionary origins are
+  always visible; `putative_model_taxon` and `mimicry_evidence`
+  (published citation, kind, confidence, `reference_source`) travel with
+  every assignment — mimicry status is cited, not asserted by developers;
+- **phylogenetic_control** — close non-mimic relatives;
+- **ecological_control** — size/substrate-matched non-mimics.
+
+Per-taxon assignments live in a curated, appendable `roles.json`; each
+episode denormalizes its taxon's role in `biological_role`.
+
+## Sampling strategy
+
+Priority tiers follow the comparison: (1) ant models, (2) known mimics,
+(3) close non-mimic relatives, (4) ecological controls. Public repository
+video (license-checked, provenance-tracked: source, DOI/URL, license,
+taxon, context, fps, scale, substrate, camera, processing history) builds
+the **Ant Reference Library**; own collections provide **matched local
+comparisons** (sympatric, same substrate/camera/conditions). Global and
+local reference sets are kept distinct — a global "ant average" must
+never stand in for the local ant community of a given mimicry system.
 
 ## Scientific question
 

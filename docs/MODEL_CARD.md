@@ -2,9 +2,13 @@
 
 ## What the models are for
 
-Behavioral retrieval: given a movement episode, find the reference
-episodes / motifs / taxa that MOVE most like it. This is explicitly **not**
-a species classifier — no model in this pipeline outputs P(species|video).
+Behavioral retrieval inside the ant-mimicry behavioral phenotype space:
+given a movement episode, find the reference episodes / motifs / taxa that
+MOVE most like it — models, independent mimic lineages, and controls.
+This is explicitly **not** a species classifier — no model in this
+pipeline outputs P(species|video) — and biological roles (model / mimic /
+controls) are never inputs to any encoder; they are overlays for
+evaluation and aggregation only.
 
 ## Models
 

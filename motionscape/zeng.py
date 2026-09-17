@@ -138,4 +138,6 @@ def load_zeng_episodes(xlsx_path: str | Path, min_frames: int = 150) -> list[Epi
                                      "turn/sinuosity dims undefined"),
             ).to_dict())
             episodes.append(ep)
+    from .roles import RoleRegistry
+    RoleRegistry().apply_to_episodes(episodes)
     return episodes

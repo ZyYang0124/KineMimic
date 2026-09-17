@@ -122,7 +122,7 @@ TEMPLATE = r"""<!DOCTYPE html>
 <canvas id="galaxy"></canvas>
 
 <header>
- <div id="brand">MOTIONSCAPE<small>an atlas of animal movement · The Murmur</small></div>
+ <div id="brand">MOTIONSCAPE<small>an explorable ant-mimicry behavioral landscape · The Murmur</small></div>
  <div id="dataset"></div>
  <div class="sp"></div>
  <div class="modeseg" id="modeseg" style="display:none">
@@ -145,8 +145,9 @@ TEMPLATE = r"""<!DOCTYPE html>
 <div id="hero">
  <canvas id="heroCv" width="1120" height="560"></canvas>
  <div id="heroQ">How does a spider move like an ant?</div>
- <div id="heroSub">MOTIONSCAPE · The Murmur — thousands of real movements, one explorable space.<br>
-   先看运动本身。物种身份,由你决定何时揭示。</div>
+ <div id="heroSub">MOTIONSCAPE · The Murmur — an explorable behavioral phenotype space
+   for the evolution of ant mimicry.<br>
+   先看运动本身。模型、拟态者与对照的身份,由你决定何时揭示。</div>
  <div id="heroHint">click to enter · 点击进入</div>
 </div>
 
@@ -156,6 +157,7 @@ TEMPLATE = r"""<!DOCTYPE html>
 let META=null, EP=[], IDX={}, serverMode=false;
 let revealed=false, revealT=0, sel=-1, motifSel=-1, T=0;
 let mode='movement', contextShade=false;
+let roleMode=false;   // color by biological role (model/mimic/controls)
 let QUERY=null, qSel=-1, qIntro=-1, uploadInfo=null;   // Find Similar state
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const COLORS={ant:"#e8a13c",mimic:"#4fd1c5",siler:"#4fd1c5",other_spider:"#b794f4",
@@ -163,6 +165,16 @@ const COLORS={ant:"#e8a13c",mimic:"#4fd1c5",siler:"#4fd1c5",other_spider:"#b794f
 const NAMES={ant:"Ant",mimic:"Mimic spider (Myrmarachne)",siler:"Siler",
              other_spider:"Other spider",other_arthropod:"Other arthropod",unknown:"Unknown"};
 const HIDDEN="#56677a";
+const ROLE_COLORS={model:"#e8a13c",mimic:"#4fd1c5",phylogenetic_control:"#b794f4",
+                   ecological_control:"#a0aec0",unknown:"#718096"};
+const ROLE_NAMES={model:"Ant model",mimic:"Ant mimic",phylogenetic_control:"Non-mimic relative",
+                  ecological_control:"Ecological control",unknown:"Unassessed"};
+function roleOf(e){const m=META&&META.roles&&META.roles[e.l];return m?m.role:"unknown";}
+function col(e,t){ // t: reveal progress 0..1
+ if(t<=0)return HIDDEN;
+ const target=roleMode?(ROLE_COLORS[roleOf(e)]||COLORS.unknown):(COLORS[e.l]||COLORS.unknown);
+ return mix(HIDDEN,target,t);
+}
 const cv=document.getElementById('galaxy'),cx=cv.getContext('2d');
 const panel=document.getElementById('panel');
 let DPR=Math.min(devicePixelRatio||1,1.5);
@@ -289,10 +301,6 @@ function hero(){
 }
 
 /* ================= The Murmur ================= */
-function col(e,t){ // t: reveal progress 0..1
- if(t<=0)return HIDDEN;
- return mix(HIDDEN,COLORS[e.l]||COLORS.unknown,t);
-}
 function mix(a,b,t){const pa=parseInt(a.slice(1),16),pb=parseInt(b.slice(1),16);
  const r=(pa>>16)+(((pb>>16)-(pa>>16))*t),g=((pa>>8)&255)+((((pb>>8)&255)-((pa>>8)&255))*t),
        bl=(pa&255)+(((pb&255)-(pa&255))*t);
@@ -755,7 +763,8 @@ function renderDictionary(){
  const humanAnn=ann[String(sel_m)];
  panel.innerHTML=`
   <h1>Motion Dictionary</h1>
-  <div class="muted">Motifs are discovered by the machine (k-means in feature space).
+  <div class="muted">Motifs are discovered by the machine (k-means in feature space) and used to find
+   <b>shared ant–mimic behavioral elements</b>: motifs frequent in ants and mimic lineages but rare in controls.
    They have numbers, not names — naming is a human act, after watching.</div>
   <div class="tabbar">${tabbar('dictionary')}</div>
   <div style="margin:6px 0">${motifs.map(m=>`<span class="chip ${m===sel_m?'on':''}" onclick="motifClick(${m})">M${m} · ${counts[m]}</span>`).join('')}</div>
@@ -897,7 +906,8 @@ function showQueryHelp(){
 function showUpload(){
  panel.innerHTML=`<h1>Find Similar</h1>
   <div class="muted">Upload a video: detection → episodes → behavior encoding →
-   your movement enters the atlas and nearby movements light up.</div>
+   your movement enters the ant-mimicry behavioral landscape, and the nearest ants,
+   mimics and controls light up. <b>Where does this animal sit in the landscape?</b></div>
   <div id="uploadBox">
    <label class="btn" style="display:inline-block">Choose a video
     <input type="file" id="qfile" accept="video/*"></label>
@@ -1016,7 +1026,7 @@ function qRender(){
   ${r.motif_hits.length?`<div style="margin-top:12px;color:var(--accent)">Closest motifs</div>
    ${r.motif_hits.map(m=>`<div class="bdrow"><span class="nm">M${m.motif}</span>
      <span class="muted">similarity ${m.similarity.toFixed(2)}</span></div>`).join('')}`:''}
-  ${(rb&&rb.taxa&&rb.taxa.length)?`<div style="margin-top:12px;color:var(--accent)">Behaviorally similar taxa <span class="muted">— not species identity</span></div>
+  ${(rb&&rb.taxa&&rb.taxa.length)?`<div style="margin-top:12px;color:var(--accent)">Behaviorally similar taxa <span class="muted">— within the ant-mimicry reference space; not species identity</span></div>
    ${rb.taxa.map(tx=>`<div class="bdrow"><span class="nm">${esc(tx.taxon)}</span>
      <span style="flex:1;height:9px;background:#101a24;border-radius:3px;position:relative">
      <span style="position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:#e8a13c;width:${Math.min(100,(tx.score_corrected*200)|0)}%"></span></span>
@@ -1106,18 +1116,43 @@ window.compareQuery=async function(rep){
 
 /* ================= Reveal species ================= */
 const revealBtn=document.getElementById('revealBtn');
+let colorBy='species';
 function toggleReveal(){
  revealed=!revealed;
- revealBtn.textContent=revealed?'◌ Hide species':'✦ Reveal species';
+ revealBtn.textContent=revealed?'◌ Hide biology':'✦ Reveal biology';
  const lg=document.getElementById('legend');
  if(revealed){
    lg.style.display='flex';
-   lg.innerHTML='<div class="muted" style="max-width:300px;margin-bottom:4px">The space was built without knowing '+
-     'what any animal is — only how it moves. Only now are names laid over it.</div>'+
-     Object.entries(COLORS).filter(([k])=>k!=='mimic'||META.labels_summary.mimic)
-       .filter(([k])=>(META.labels_summary[k]||0)>0)
-       .map(([k,c])=>`<div><span class="dot" style="background:${c}"></span>${NAMES[k]||k} · ${(META.labels_summary[k]||0)}</div>`).join('');
+   lg.innerHTML='<div class="muted" style="max-width:310px;margin-bottom:4px">The space was built without knowing '+
+     'what any animal is — only how it moves. Only now are biology and roles laid over it.</div>'+
+     '<div class="modeseg" style="margin:6px 0"><button class="btn '+(colorBy==='species'?'on':'')+
+       '" id="cbSpecies" style="padding:2px 10px;font-size:11px">species</button>'+
+     '<button class="btn '+(colorBy==='roles'?'on':'')+'" id="cbRoles" style="padding:2px 10px;font-size:11px">roles</button></div>'+
+     '<div id="legendRows"></div>';
+   renderLegend();
+   const sp=document.getElementById('cbSpecies'), ro=document.getElementById('cbRoles');
+   sp.onclick=()=>{colorBy='species';roleMode=false;renderLegend();
+     sp.classList.add('on');ro.classList.remove('on');};
+   ro.onclick=()=>{colorBy='roles';roleMode=true;renderLegend();
+     ro.classList.add('on');sp.classList.remove('on');};
  }else lg.style.display='none';
+}
+function renderLegend(){
+ const host=document.getElementById('legendRows'); if(!host)return;
+ if(colorBy==='species'){
+   host.innerHTML=Object.entries(COLORS)
+     .filter(([k])=>(META.labels_summary[k]||0)>0)
+     .map(([k,c])=>{const role=(META.roles&&META.roles[k])?META.roles[k].role:'unknown';
+       return `<div><span class="dot" style="background:${c}"></span>${NAMES[k]||k} · ${(META.labels_summary[k]||0)}`+
+         `<span class="muted"> — ${ROLE_NAMES[role]}</span></div>`;}).join('');
+ }else{
+   const counts={};EP.forEach(e=>{const r=roleOf(e);counts[r]=(counts[r]||0)+1;});
+   host.innerHTML=Object.entries(ROLE_COLORS)
+     .filter(([r])=>counts[r])
+     .map(([r,c])=>`<div><span class="dot" style="background:${c}"></span>${ROLE_NAMES[r]} · ${counts[r]}</div>`).join('')+
+     `<div class="muted" style="max-width:300px;margin-top:4px">Roles frame the comparison: mimics vs ant models vs
+      non-mimic relatives vs ecological controls — behavioral convergence across independent origins becomes visible.</div>`;
+ }
 }
 revealBtn.onclick=toggleReveal;
 </script>

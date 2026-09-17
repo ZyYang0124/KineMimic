@@ -102,4 +102,6 @@ def load_shamble_episodes(mat_path: str | Path,
                             species=str(getattr(tr, "species_name", ""))),
         ).to_dict())
         episodes.append(ep)
+    from .roles import RoleRegistry
+    RoleRegistry().apply_to_episodes(episodes)
     return episodes
