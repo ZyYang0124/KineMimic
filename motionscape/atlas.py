@@ -73,6 +73,60 @@ def extract_clip(ep: Episode, out_gif: str) -> str:
     return out_gif
 
 
+def _series(ep: Episode, n: int = 240) -> dict:
+    """Downsampled speed / turn-rate / moving time series for sparkline rows."""
+    xy = np.asarray(ep.centroids_px, float)
+    fr = np.asarray(ep.frames, int) if ep.frames else np.arange(len(xy))
+    keep = np.isfinite(xy).all(axis=1)
+    xy, fr = xy[keep], fr[keep]
+    out = {"speed": [0.0], "turn": [0.0], "moving": [0.0]}
+    if len(xy) > 2:
+        same = np.diff(fr) == 1
+        d = np.hypot(*np.diff(xy, axis=0).T)
+        v = (d * ep.fps)[same]
+        heading = np.arctan2(*np.diff(xy, axis=0).T[::-1])
+        valid = same[:-1] & same[1:] if len(same) > 1 else np.zeros(0, bool)
+        omega = (np.abs(np.diff(heading)) * ep.fps)[valid]
+        thresh = 0.1 * np.median(v)
+        def rs(a):
+            if len(a) == 0:
+                return [0.0]
+            idx = np.unique(np.linspace(0, len(a) - 1, min(n, len(a))).astype(int))
+            return [float(x) for x in a[idx]]
+        out = {"speed": rs(v), "turn": rs(omega),
+               "moving": rs((v > thresh).astype(float))}
+    return out
+
+
+def traj_replay_clip(ep: Episode, out_gif: str, color: tuple = (79, 209, 197)) -> str:
+    """Trajectory-replay GIF for episodes without accessible source video:
+    the real path grows at (loop-compressed) real time on a dark field."""
+    from PIL import Image, ImageDraw
+    xy = np.asarray(ep.centroids_px, float)
+    xy = xy[np.isfinite(xy).all(axis=1)]
+    W, H = CLIP_W, 300
+    x0, x1 = xy[:, 0].min(), xy[:, 0].max()
+    y0, y1 = xy[:, 1].min(), xy[:, 1].max()
+    sc = min((W - 60) / max(x1 - x0, 1e-9), (H - 60) / max(y1 - y0, 1e-9))
+    P = lambda p: (30 + (p[0] - x0) * sc, H - 30 - (p[1] - y0) * sc)
+    n_out = min(100, max(24, len(xy) // 8))
+    idx = np.unique(np.linspace(0, len(xy) - 1, n_out).astype(int))
+    frames = []
+    for j, i in enumerate(idx):
+        img = Image.new("RGB", (W, H), (7, 11, 16))
+        dr = ImageDraw.Draw(img)
+        pts = [P(xy[k]) for k in idx[:j + 1]]
+        dr.line(pts, fill=color + (200,), width=2)
+        for q in pts[::max(1, len(pts) // 40)]:      # waypoint crumbs
+            dr.ellipse([q[0] - 1, q[1] - 1, q[0] + 1, q[1] + 1], fill=(60, 90, 110))
+        h = pts[-1]
+        dr.ellipse([h[0] - 4, h[1] - 4, h[0] + 4, h[1] + 4], fill=color)
+        frames.append(img)
+    frames[0].save(out_gif, save_all=True, append_images=frames[1:],
+                   duration=int(1000 * CLIP_MAX_S / n_out), loop=0)
+    return out_gif
+
+
 def _speed_series(ep: Episode, n: int = 240) -> list[float]:
     xy = np.asarray(ep.centroids_px, float)
     v = np.hypot(*np.diff(xy, axis=0).T) * ep.fps
@@ -107,6 +161,15 @@ def _window_embedding_path(ep: Episode, mu, sd, comp) -> list[list[float]]:
 FEATURE_ORDER = sorted(trajectory_features([[0, 0], [1, 0], [0, 1]], 30.0).keys())
 
 
+def _traj_pts(ep: Episode, n: int = 200) -> list[list[float]]:
+    xy = np.asarray(ep.centroids_px, float)
+    xy = xy[np.isfinite(xy).all(axis=1)]
+    if len(xy) < 2:
+        return []
+    idx = np.unique(np.linspace(0, len(xy) - 1, min(n, len(xy))).astype(int))
+    return [[float(a), float(b)] for a, b in xy[idx]]
+
+
 def build_atlas(episodes: list[Episode], out_dir: str | Path,
                 run_provenance: dict | None = None) -> Path:
     out_dir = Path(out_dir)
@@ -124,26 +187,54 @@ def build_atlas(episodes: list[Episode], out_dir: str | Path,
 
     payload = []
     for i, ep in enumerate(episodes):
-        gif = extract_clip(ep, str(out_dir / "clips" / f"{ep.episode_id}.gif"))
+        gif_name = f"{ep.episode_id}.gif"
+        gif_path = out_dir / "clips" / gif_name
+        has_video = (not ep.source_video_path.startswith("dryad:")
+                     and Path(ep.source_video_path).exists())
+        try:
+            if has_video:
+                extract_clip(ep, str(gif_path))
+                clip_kind = "video"
+            else:
+                traj_replay_clip(ep, str(gif_path))
+                clip_kind = "traj_replay"
+        except Exception:
+            traj_replay_clip(ep, str(gif_path))
+            clip_kind = "traj_replay"
+        s = _series(ep)
+        hour = None
+        if ep.environment.time:
+            try:
+                import datetime as _dt
+                t = _dt.datetime.strptime(ep.environment.time.strip(), "%I:%M %p")
+                hour = t.hour + t.minute / 60.0
+            except ValueError:
+                pass
         payload.append({
             "episode_id": ep.episode_id,
             "video_id": ep.source_video_id,
             "bio_label": ep.bio_label,
+            "species_detail": ep.bio_label_detail.get("species", ""),
             "motif": ep.motif,
             "embedding": ep.embedding or [0, 0],
             "path": _window_embedding_path(ep, mu, sd, Vt),
             "speed_cv": ep.trajectory_features.get("speed_cv", 0.0),
-            "speed_series": _speed_series(ep),
+            "series": s,
             "frac_moving": ep.trajectory_features.get("frac_time_moving", 0.0),
             "n_pauses": ep.trajectory_features.get("n_pauses", 0),
             "duration_s": ep.duration_s,
             "frames": [ep.start_frame, ep.end_frame],
-            "clip": f"clips/{Path(gif).name}",
+            "hour": hour,
+            "date": ep.environment.date,
+            "clip_kind": clip_kind,
+            "clip": f"clips/{gif_name}",
+            "trajectory": _traj_pts(ep),
             "neighbors": [
                 {"episode_id": episodes[j].episode_id,
                  "bio_label": episodes[j].bio_label,
                  "clip": f"clips/{episodes[j].episode_id}.gif",
-                 "dist": float(np.sqrt(dist[i, j]))}
+                 "dist": float(np.sqrt(dist[i, j])),
+                 "similarity": float(np.exp(-np.sqrt(dist[i, j]) / 3))}
                 for j in nn_idx[i]],
             "features": {k: float(v) for k, v in ep.trajectory_features.items()},
             "provenance_chain": ep.provenance_chain(),

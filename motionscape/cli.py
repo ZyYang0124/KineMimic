@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 
 from .atlas import build_atlas
+from .shamble import load_shamble_episodes
 from .pipeline import ingest_video, analyze
 from .store import EpisodeStore
 from .synth import generate_paths, render_video
@@ -51,6 +52,18 @@ def cmd_demo(args):
     print(f"  atlas:          {atlas}  <- open in browser")
 
 
+def cmd_shamble(args):
+    """Real-data showcase: Shamble 2017 trajectories -> episodes -> galaxy."""
+    from .pipeline import analyze
+    from .store import EpisodeStore
+    eps = load_shamble_episodes(args.mat, video_dir=args.videos)
+    store = EpisodeStore(args.store)
+    run_dir = analyze(store, eps, n_motifs=args.n_motifs)
+    atlas = build_atlas(eps, run_dir / "atlas")
+    _print_summary(run_dir)
+    print(f"  atlas: {atlas}  <- serve: python -m http.server (inside atlas dir)")
+
+
 def cmd_ingest(args):
     store = EpisodeStore(args.store)
     all_eps = []
@@ -86,6 +99,13 @@ def main(argv=None):
     d.add_argument("--min-episode-s", type=float, default=3.0)
     d.add_argument("--n-motifs", type=int, default=6)
     d.set_defaults(fn=cmd_demo)
+
+    sh = sub.add_parser("shamble", help="build galaxy from Shamble 2017 Dryad data")
+    sh.add_argument("--mat", default="data/external/shamble2017/OverallMovement/OverallMovement/data/data_folders_5_to_18_v3.mat")
+    sh.add_argument("--videos", default="data/external/shamble2017/OverallMovement/OverallMovement/example videos")
+    sh.add_argument("--store", default="motionscape_runs")
+    sh.add_argument("--n-motifs", type=int, default=8)
+    sh.set_defaults(fn=cmd_shamble)
 
     g = sub.add_parser("ingest", help="process real videos")
     g.add_argument("video", nargs="+")

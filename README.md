@@ -29,8 +29,10 @@ pipeline, and writes a run directory containing `episodes.jsonl`,
 `atlas/index.html` — **The Atlas**: serve it (`python -m http.server`
 inside the atlas dir) and open in a browser.
 
-### The Atlas experience
+### The Movement Galaxy experience
 
+- **Hero intro** — a real trajectory grows on a dark field under the question
+  *"How does a spider move like an ant?"*; one click dissolves into the galaxy.
 - **Explore the flock** — the landing view is a living murmuration.
   Particles are positioned by behavioral similarity only (species colors
   hidden); each particle drifts along its episode's *real* sliding-window
@@ -39,11 +41,17 @@ inside the atlas dir) and open in a browser.
   you discover which regions are ants, which are Siler.
 - **Explore a movement** — click any particle: the original video clip
   plays, with live trajectory trace, speed sparkline, pause statistics,
-  and the **most similar movements** (nearest episodes in feature space)
-  playing alongside, each with its provenance chain.
-- **Explore a motif** — select a discovered motif (M0, M1, …) and the
-  rest of the flock fades while representative episodes are listed with
-  their species composition (🐜 🕷 🐜 …).
+  playing alongside, with **speed / turn / moving** time-series rows, and
+  **Compare with nearest ant** for a split-screen side-by-side. Every clip is
+  either the true source video (where available) or a trajectory replay whose
+  motion is the real path — never decoration.
+- **Explore a motif (Motion Dictionary)** — select a discovered motif; the
+  rest of the galaxy fades and the panel shows species-occurrence bars plus
+  representative clips. Machine discovers behaviors; humans name them after
+  watching (e.g. M2: 65.6% ant, 28.1% non-mimic, 6.3% mimic).
+- **Behavior River** — species movement volume flowing across the day
+  (hour-of-day when timestamps exist): rhythmic differences between ants,
+  mimics and non-mimics become visible science questions.
 
 ## Commands
 

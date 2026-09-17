@@ -67,7 +67,8 @@ def analyze(store: EpisodeStore, episodes: list[Episode], n_motifs: int = 8,
         ep.processing_history.append(Provenance(
             software_version=__version__, model_name=FEAT_MODEL, model_version="1").to_dict())
 
-    label_episodes(episodes)
+    # external gold labels (e.g. dataset metadata) are never overwritten
+    label_episodes([ep for ep in episodes if ep.bio_label_source == "unannotated"])
 
     X, names = feature_matrix(episodes)
     emb, prov = PCAEmbedder(n_components=2).fit_transform(X, names)
@@ -80,12 +81,13 @@ def analyze(store: EpisodeStore, episodes: list[Episode], n_motifs: int = 8,
         ep.motif = int(m)
         ep.processing_history.append(mprov.to_dict())
 
-    groups = {g: np.array([ep.bio_label == g for ep in episodes])
-              for g in ("ant", "siler", "other_spider", "unknown")}
+    group_names = ("ant", "siler", "mimic", "other_spider", "unknown")
+    groups = {g: np.array([ep.bio_label == g for ep in episodes]) for g in group_names}
     profiles = motif_profile(labels, {k: v for k, v in groups.items() if v.any()})
 
-    fp = mimicry_fingerprint([e for e in episodes if e.bio_label == "siler"],
-                             [e for e in episodes if e.bio_label == "ant"])
+    fp = mimicry_fingerprint([e for e in episodes if e.bio_label in ("siler", "mimic")],
+                             [e for e in episodes if e.bio_label == "ant"],
+                             others=[e for e in episodes if e.bio_label == "other_spider"])
 
     store.write_episodes(run_dir, episodes)
     (run_dir / "summary.json").write_text(json.dumps(
