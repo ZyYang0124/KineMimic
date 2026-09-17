@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "murmur-ethology"
+name = "motionscape"
 version = "0.1.0"
 description = "Computational ethology platform for ant-mimicking jumping spiders (Siler) and sympatric ants"
 readme = "README.md"
@@ -12,7 +12,7 @@ license = { text = "MIT" }
 dependencies = ["numpy", "scipy", "opencv-python"]
 
 [project.scripts]
-murmur = "murmur.cli:main"
+motionscape = "motionscape.cli:main"
 
 [tool.setuptools]
-packages = ["murmur"]
+packages = ["motionscape"]

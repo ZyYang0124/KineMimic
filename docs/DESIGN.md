@@ -1,11 +1,11 @@
-# Murmur — Design Document
+# MOTIONSCAPE — Design Document
 
 ## Scientific question
 
 > How does a jumping spider (*Siler*) move like an ant — in which behavioral
 > dimensions, and how strongly?
 
-Murmur converts naturalistic video into millions-scale collections of short
+MOTIONSCAPE converts naturalistic video into millions-scale collections of short
 movement episodes and builds an explorable behavioral space, enabling both
 quantitative hypothesis tests (Siler vs ant overlap per dimension) and
 qualitative discovery (watching why two episodes are similar).

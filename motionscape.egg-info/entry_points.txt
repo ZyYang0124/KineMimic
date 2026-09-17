@@ -1,0 +1,2 @@
+[console_scripts]
+motionscape = motionscape.cli:main

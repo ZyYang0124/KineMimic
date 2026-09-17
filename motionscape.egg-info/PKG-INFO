@@ -1,3 +1,14 @@
+Metadata-Version: 2.4
+Name: motionscape
+Version: 0.1.0
+Summary: Computational ethology platform for ant-mimicking jumping spiders (Siler) and sympatric ants
+License: MIT
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: numpy
+Requires-Dist: scipy
+Requires-Dist: opencv-python
+
 # MOTIONSCAPE — The Atlas of Animal Movement
 
 最终产品不是行为分析软件，而是一张**可以探索的动物运动图谱**；

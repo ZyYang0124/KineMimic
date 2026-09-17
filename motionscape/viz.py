@@ -28,7 +28,7 @@ _TEMPLATE = r"""<!DOCTYPE html>
 <html lang="zh">
 <head>
 <meta charset="utf-8">
-<title>Murmur — Movement Murmuration</title>
+<title>MOTIONSCAPE — Movement Murmuration</title>
 <style>
  body{margin:0;background:#0b0f14;color:#d8e2ec;font:14px/1.5 system-ui,sans-serif}
  #stage{display:flex;height:100vh}
@@ -48,7 +48,7 @@ _TEMPLATE = r"""<!DOCTYPE html>
 <div id="stage">
  <canvas id="canvas"></canvas>
  <div id="panel">
-  <h1>Murmur · Movement Murmuration</h1>
+  <h1>MOTIONSCAPE · Movement Murmuration</h1>
   <div class="legend" id="legend"></div>
   <div class="muted">每个粒子 = 一段真实运动片段（episode）。位置=行为空间嵌入；抖动幅度=运动间歇性(speed_cv)；颜色=类别。点击粒子查看溯源并回放轨迹。</div>
   <div id="detail"></div>

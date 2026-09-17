@@ -1,4 +1,4 @@
-"""Murmur — The Atlas of Animal Movement.
+"""MOTIONSCAPE — The Atlas of Animal Movement.
 
 Builds the explorable atlas: a self-contained directory with ``index.html``
 and per-episode animated GIF clips straight from the source video.
@@ -150,7 +150,7 @@ def build_atlas(episodes: list[Episode], out_dir: str | Path,
         })
 
     (out_dir / "data.json").write_text(
-        json.dumps({"episodes": payload, "murmur_version": __version__,
+        json.dumps({"episodes": payload, "motionscape_version": __version__,
                     "provenance": run_provenance or {}}, ensure_ascii=False),
         encoding="utf-8")
     _write_index(out_dir)

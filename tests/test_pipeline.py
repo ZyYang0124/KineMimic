@@ -4,13 +4,13 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from murmur.schema import Episode
-from murmur.features import trajectory_features, feature_matrix
-from murmur.synth import generate_paths
-from murmur.track import tracks_to_episodes, Track
-from murmur.classify import classify_episode, mimicry_fingerprint
-from murmur.embedding import PCAEmbedder
-from murmur.motifs import find_motifs
+from motionscape.schema import Episode
+from motionscape.features import trajectory_features, feature_matrix
+from motionscape.synth import generate_paths
+from motionscape.track import tracks_to_episodes, Track
+from motionscape.classify import classify_episode, mimicry_fingerprint
+from motionscape.embedding import PCAEmbedder
+from motionscape.motifs import find_motifs
 
 
 def test_features_separate_archetypes():

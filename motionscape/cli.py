@@ -1,8 +1,8 @@
-"""Murmur command-line interface.
+"""MOTIONSCAPE command-line interface.
 
-    python -m murmur demo --out runs_demo        # full tour on synthetic videos
-    python -m murmur ingest VIDEO [VIDEO...] --id ID... --store runs
-    python -m murmur viz runs/run_xxx/episodes.jsonl --out viz.html
+    python -m motionscape demo --out runs_demo        # full tour on synthetic videos
+    python -m motionscape ingest VIDEO [VIDEO...] --id ID... --store runs
+    python -m motionscape viz runs/run_xxx/episodes.jsonl --out viz.html
 """
 
 from __future__ import annotations
@@ -77,11 +77,11 @@ def cmd_viz(args):
 
 
 def main(argv=None):
-    p = argparse.ArgumentParser(prog="murmur")
+    p = argparse.ArgumentParser(prog="motionscape")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     d = sub.add_parser("demo", help="synthetic end-to-end tour")
-    d.add_argument("--out", default="murmur_runs")
+    d.add_argument("--out", default="motionscape_runs")
     d.add_argument("--seconds", type=float, default=30, help="per video")
     d.add_argument("--min-episode-s", type=float, default=3.0)
     d.add_argument("--n-motifs", type=int, default=6)
@@ -90,7 +90,7 @@ def main(argv=None):
     g = sub.add_parser("ingest", help="process real videos")
     g.add_argument("video", nargs="+")
     g.add_argument("--id", nargs="+", required=True)
-    g.add_argument("--store", default="murmur_runs")
+    g.add_argument("--store", default="motionscape_runs")
     g.add_argument("--min-episode-s", type=float, default=3.0)
     g.add_argument("--n-motifs", type=int, default=8)
     g.set_defaults(fn=cmd_ingest)
