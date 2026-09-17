@@ -13,6 +13,7 @@ from pathlib import Path
 
 from .atlas import build_atlas
 from .shamble import load_shamble_episodes
+from .zeng import load_zeng_episodes
 from .pipeline import ingest_video, analyze
 from .store import EpisodeStore
 from .synth import generate_paths, render_video
@@ -64,6 +65,18 @@ def cmd_shamble(args):
     print(f"  atlas: {atlas}  <- serve: python -m http.server (inside atlas dir)")
 
 
+def cmd_zeng(args):
+    """Gait universe: Zeng 2023 Siler collingwoodi velocity/pose episodes."""
+    from .pipeline import analyze
+    from .store import EpisodeStore
+    eps = load_zeng_episodes(args.xlsx)
+    store = EpisodeStore(args.store)
+    run_dir = analyze(store, eps, n_motifs=args.n_motifs)
+    atlas = build_atlas(eps, run_dir / "atlas")
+    _print_summary(run_dir)
+    print(f"  atlas: {atlas}")
+
+
 def cmd_ingest(args):
     store = EpisodeStore(args.store)
     all_eps = []
@@ -106,6 +119,12 @@ def main(argv=None):
     sh.add_argument("--store", default="motionscape_runs")
     sh.add_argument("--n-motifs", type=int, default=8)
     sh.set_defaults(fn=cmd_shamble)
+
+    z = sub.add_parser("zeng", help="gait universe from Zeng 2023 raw gait data")
+    z.add_argument("--xlsx", default="data/external/Zeng_et_al_2023_Gait analysis_raw data.xlsx")
+    z.add_argument("--store", default="motionscape_runs/zeng")
+    z.add_argument("--n-motifs", type=int, default=8)
+    z.set_defaults(fn=cmd_zeng)
 
     g = sub.add_parser("ingest", help="process real videos")
     g.add_argument("video", nargs="+")

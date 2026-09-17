@@ -63,9 +63,10 @@ def analyze(store: EpisodeStore, episodes: list[Episode], n_motifs: int = 8,
                             parent_run=parent_run)
 
     for ep in episodes:
-        ep.trajectory_features = trajectory_features(ep.centroids_px, ep.fps, ep.px_per_cm, ep.frames)
-        ep.processing_history.append(Provenance(
-            software_version=__version__, model_name=FEAT_MODEL, model_version="1").to_dict())
+        if not ep.trajectory_features:  # velocity episodes arrive with features
+            ep.trajectory_features = trajectory_features(ep.centroids_px, ep.fps, ep.px_per_cm, ep.frames)
+            ep.processing_history.append(Provenance(
+                software_version=__version__, model_name=FEAT_MODEL, model_version="1").to_dict())
 
     # external gold labels (e.g. dataset metadata) are never overwritten
     label_episodes([ep for ep in episodes if ep.bio_label_source == "unannotated"])

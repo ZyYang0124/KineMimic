@@ -73,8 +73,20 @@ def extract_clip(ep: Episode, out_gif: str) -> str:
     return out_gif
 
 
+def _is_velocity_ep(ep: Episode) -> bool:
+    return bool(ep.metadata.get("velocity_series"))
+
+
 def _series(ep: Episode, n: int = 240) -> dict:
     """Downsampled speed / turn-rate / moving time series for sparkline rows."""
+    if _is_velocity_ep(ep):
+        v = np.asarray(ep.metadata["velocity_series"], float)
+        thresh = 0.1 * max(np.median(v), 1e-9)
+        def rs(a):
+            idx = np.unique(np.linspace(0, len(a) - 1, min(n, len(a))).astype(int))
+            return [float(x) for x in a[idx]]
+        return {"speed": rs(v), "turn": [0.0] * min(n, len(v)),
+                "moving": rs((v > thresh).astype(float))}
     xy = np.asarray(ep.centroids_px, float)
     fr = np.asarray(ep.frames, int) if ep.frames else np.arange(len(xy))
     keep = np.isfinite(xy).all(axis=1)
@@ -96,6 +108,39 @@ def _series(ep: Episode, n: int = 240) -> dict:
         out = {"speed": rs(v), "turn": rs(omega),
                "moving": rs((v > thresh).astype(float))}
     return out
+
+
+def gait_replay_clip(ep: Episode, out_gif: str, color: tuple = (79, 209, 197)) -> str:
+    """Velocity-episode replay: two stacked real traces growing together --
+    speed (top) and foreleg-I / antennae height (bottom, normalized)."""
+    from PIL import Image, ImageDraw
+    v = np.asarray(ep.metadata["velocity_series"], float)
+    f = np.asarray(ep.metadata["forelimb_series"], float)
+    W, H = CLIP_W, 320
+    vmx = np.nanmax(np.abs(v)) or 1.0
+    fmin, fmax = np.nanmin(f), np.nanmax(f)
+    frng = max(fmax - fmin, 1e-9)
+    n_out = min(100, max(30, len(v) // 6))
+    idx = np.unique(np.linspace(0, len(v) - 1, n_out).astype(int))
+    frames = []
+    for j, _ in enumerate(idx):
+        img = Image.new("RGB", (W, H), (7, 11, 16))
+        dr = ImageDraw.Draw(img)
+        k = idx[:j + 1]
+        X = lambda i: 30 + i / (n_out - 1) * (W - 60)
+        # top panel: speed
+        pts = [(X(i), 80 - v[i] / vmx * 60) for i in k]
+        dr.line(pts, fill=(232, 161, 60), width=2)
+        # bottom panel: forelimb-I (spiders) / antennae (ants) height
+        pts2 = [(X(i), 220 - (f[i] - fmin) / frng * 80) for i in k]
+        dr.line(pts2, fill=color, width=2)
+        dr.text((30, 12), "speed (mm/s, real)", fill=(120, 140, 160))
+        dr.text((30, 150), "foreleg-I / antennae height (real)", fill=(120, 140, 160))
+        dr.line([(30, 145), (W - 30, 145)], fill=(25, 35, 48), width=1)
+        frames.append(img)
+    frames[0].save(out_gif, save_all=True, append_images=frames[1:],
+                   duration=int(1000 * CLIP_MAX_S / n_out), loop=0)
+    return out_gif
 
 
 def traj_replay_clip(ep: Episode, out_gif: str, color: tuple = (79, 209, 197)) -> str:
@@ -144,9 +189,16 @@ def _window_embedding_path(ep: Episode, mu, sd, comp) -> list[list[float]]:
     win = max(int(WINDOW_S * ep.fps), 2)
     stride = max(int(STRIDE_S * ep.fps), 1)
     path = []
-    for s in range(0, max(len(xy) - win, 0) + 1, stride):
-        f = trajectory_features(xy[s:s + win].tolist(), ep.fps, ep.px_per_cm,
-                                fr[s:s + win].tolist())
+    from .zeng import velocity_features
+    for s0 in range(0, max(len(xy) - win, 0) + 1, stride):
+        if _is_velocity_ep(ep):
+            v = np.asarray(ep.metadata["velocity_series"], float)
+            w = max(int(win * len(v) / max(len(xy), 1)), 10)
+            f = velocity_features(v[s0 * len(v) // max(len(xy), 1):
+                                    (s0 + 1) * len(v) // max(len(xy), 1)])
+        else:
+            f = trajectory_features(xy[s0:s0 + win].tolist(), ep.fps, ep.px_per_cm,
+                                    fr[s0:s0 + win].tolist())
         row = np.array([f.get(k.replace(" ", "_"), 0.0) for k in FEATURE_ORDER])
         path.append([float(x) for x in ((row - mu) / sd) @ comp[:2].T])
     if not path:
@@ -162,6 +214,10 @@ FEATURE_ORDER = sorted(trajectory_features([[0, 0], [1, 0], [0, 1]], 30.0).keys(
 
 
 def _traj_pts(ep: Episode, n: int = 200) -> list[list[float]]:
+    if _is_velocity_ep(ep):
+        v = np.asarray(ep.metadata["velocity_series"], float)
+        idx = np.unique(np.linspace(0, len(v) - 1, min(n, len(v))).astype(int))
+        return [[float(i), float(v[i])] for i in idx]   # speed-space curve
     xy = np.asarray(ep.centroids_px, float)
     xy = xy[np.isfinite(xy).all(axis=1)]
     if len(xy) < 2:
@@ -195,12 +251,15 @@ def build_atlas(episodes: list[Episode], out_dir: str | Path,
             if has_video:
                 extract_clip(ep, str(gif_path))
                 clip_kind = "video"
+            elif _is_velocity_ep(ep):
+                gait_replay_clip(ep, str(gif_path))
+                clip_kind = "gait_replay"
             else:
                 traj_replay_clip(ep, str(gif_path))
                 clip_kind = "traj_replay"
         except Exception:
-            traj_replay_clip(ep, str(gif_path))
-            clip_kind = "traj_replay"
+            gait_replay_clip(ep, str(gif_path))
+            clip_kind = "gait_replay"
         s = _series(ep)
         hour = None
         if ep.environment.time:

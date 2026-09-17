@@ -84,7 +84,7 @@ FEATURE_NAMES = list(trajectory_features([[0, 0], [1, 0]], 30.0).keys())
 def feature_matrix(episodes) -> tuple[np.ndarray, list[str]]:
     rows, names = [], None
     for ep in episodes:
-        feats = trajectory_features(ep.centroids_px, ep.fps, ep.px_per_cm, ep.frames)
+        feats = ep.trajectory_features or trajectory_features(ep.centroids_px, ep.fps, ep.px_per_cm, ep.frames)
         if names is None:
             names = sorted(feats)
         rows.append([feats[k] for k in names])

@@ -90,6 +90,9 @@ def mimicry_fingerprint(siler: list[Episode], ants: list[Episode],
         a, b = vals(siler, key), vals(ants, key)
         if len(a) < 3 or len(b) < 3:
             continue
+        # degenerate dims (constant, e.g. undefined for velocity episodes) carry no signal
+        if np.ptp(a) < 1e-12 and np.ptp(b) < 1e-12:
+            continue
         lo = min(a.min(), b.min()); hi = max(a.max(), b.max()) + 1e-9
         fp[dim] = overlap(a, b, np.linspace(lo, hi, 25))
     prov = Provenance(software_version=__version__, model_name="bhattacharyya-v1",
