@@ -99,4 +99,17 @@ Pose (esp. Siler foreleg-I vs ant antennae), behavioral grammar
 (motif transition sequences), non-mimetic jumping spider controls,
 video-clip playback on episode click, real field data ingest.
 
+## Your own videos
+
+Film spiders and ants together, then:
+
+```bash
+python -m motionscape ingest myvideo.mp4 --id siteA_01
+```
+
+Detection → episodes → galaxy → mimicry comparison, fully automatic.
+Filming tips, tuning and annotation refinement: **`docs/UPLOAD.md`**.
+Validated end-to-end on real field footage (83 episodes from 57 s of
+120 fps GoPro video).
+
 See `docs/DESIGN.md` for the full data model and provenance contract.

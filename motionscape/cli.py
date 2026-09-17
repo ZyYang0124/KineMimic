@@ -81,7 +81,8 @@ def cmd_ingest(args):
     store = EpisodeStore(args.store)
     all_eps = []
     for vid, vid_id in zip(args.video, args.id):
-        all_eps += ingest_video(vid, store, vid_id, min_duration_s=args.min_episode_s)
+        all_eps += ingest_video(vid, store, vid_id, min_duration_s=args.min_episode_s,
+                                target_fps=args.target_fps)
     run_dir = analyze(store, all_eps, n_motifs=args.n_motifs)
     atlas = build_atlas(all_eps, run_dir / "atlas")
     _print_summary(run_dir)
@@ -132,6 +133,8 @@ def main(argv=None):
     g.add_argument("--store", default="motionscape_runs")
     g.add_argument("--min-episode-s", type=float, default=3.0)
     g.add_argument("--n-motifs", type=int, default=8)
+    g.add_argument("--target-fps", type=float, default=30.0,
+                   help="analyze above this fps by frame skipping (faster)")
     g.set_defaults(fn=cmd_ingest)
 
     a = sub.add_parser("atlas", help="build explorable atlas from episodes.jsonl")

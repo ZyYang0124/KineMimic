@@ -29,14 +29,18 @@ def trajectory_features(centroids: list[list[float]], fps: float,
     # so exit/re-entry teleports never contaminate kinematics
     keep = np.isfinite(xy_all).all(axis=1)
     xy, fr = xy_all[keep], fr_all[keep]
-    dt = 1.0 / fps
     if len(xy) < 2:
         return {"duration_s": len(xy_all) * dt}
 
     scale = px_per_cm if px_per_cm else 1.0  # px -> cm
     xy_c = xy * scale
-    same_run = np.diff(fr) == 1              # consecutive frames only
-    d = np.hypot(*np.diff(xy_c, axis=0).T)   # step length per frame
+    # frame spacing: 1 for native tracking, N when high-fps video was analyzed
+    # with frame skipping (frames stay in original video time)
+    steps = np.diff(fr)
+    step = int(np.bincount(steps[steps > 0]).argmax()) if (steps > 0).any() else 1
+    dt = step / fps                           # true seconds between samples
+    same_run = steps == step                  # within a continuous sampling run
+    d = np.hypot(*np.diff(xy_c, axis=0).T)   # step length per sample
     v = (d / dt)[same_run]                    # speed within continuous runs
     heading = np.arctan2(*np.diff(xy_c, axis=0).T[::-1])
     step_valid = same_run[:-1] & same_run[1:]
