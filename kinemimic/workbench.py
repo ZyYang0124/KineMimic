@@ -1,6 +1,6 @@
 """Annotation workbench: a fast human review interface for episodes.
 
-    python -m motionscape annotate <path/to/episodes.jsonl> [--store ROOT]
+    python -m kinemimic annotate <path/to/episodes.jsonl> [--store ROOT]
 
 Layout: episode clip (cropped, zoomed to the animal) on the left; metadata
 and the machine prediction on the right; classification controls at the
@@ -117,7 +117,7 @@ class Workbench:
 
 
 TEMPLATE = r"""<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8">
-<title>MOTIONSCAPE — Annotation Workbench</title><style>
+<title>KineMimic — Annotation Workbench</title><style>
  body{margin:0;background:#0a0f14;color:#d8e2ec;font:14px/1.5 system-ui,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
  header{display:flex;align-items:baseline;gap:14px;padding:10px 16px;border-bottom:1px solid #16212d}
  header h1{font-size:15px;margin:0;color:#9fe8df;font-weight:500}
@@ -142,7 +142,7 @@ TEMPLATE = r"""<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8">
  #toast{position:fixed;bottom:64px;left:50%;transform:translateX(-50%);background:#14303a;color:#c8f2ec;padding:6px 16px;border-radius:16px;font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none}
  #skipnote{position:absolute;bottom:8px;left:12px;font-size:11px;color:#4a5a6a}
 </style></head><body>
-<header><h1>MOTIONSCAPE · Annotation Workbench</h1>
+<header><h1>KineMimic · Annotation Workbench</h1>
  <div id="prog"><b>0</b> / 0</div>
  <div id="counts"></div></header>
 <main><div id="left"><div id="idx"></div><img id="clip"><div id="skipnote">←/→ 导航 · Z 撤销 · 标注后自动进入下一条,即时持久化</div></div>
@@ -296,7 +296,7 @@ def run_workbench(episodes_path: str | Path, store_root: str | Path | None = Non
     wb = Workbench(episodes_path, store_root)
     s = summary(wb.episodes)
     httpd = ThreadingHTTPServer(("127.0.0.1", port), make_handler(wb))
-    print(f"MOTIONSCAPE annotation workbench: http://127.0.0.1:{port}/")
+    print(f"KineMimic annotation workbench: http://127.0.0.1:{port}/")
     print(f"  episodes: {wb.episodes_path}  ({s['total']} total, {s['reviewed']} reviewed)")
     print(f"  log:      {wb.store_root / 'annotations' / 'annotations.jsonl'}")
     try:

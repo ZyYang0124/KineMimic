@@ -1,5 +1,5 @@
-murmur_runs/
-motionscape_runs/
+kinemimic_runs/
+kinemimic_runs/
 benchmarks/atlas_*/
 _t*.avi
 _t*.js
@@ -7,3 +7,5 @@ _mask.png
 __pycache__/
 *.pyc
 data/external/
+kinemimic.egg-info/
+*.egg-info/

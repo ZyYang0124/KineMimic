@@ -1,4 +1,4 @@
-"""MOTIONSCAPE encoders: movement episodes -> fixed-dim behavior vectors.
+"""KineMimic encoders: movement episodes -> fixed-dim behavior vectors.
 
 A behavioral retrieval system, not a species classifier: encoders map
 trajectories to vectors z ∈ R^d such that similar MOVEMENTS land close

@@ -1,7 +1,7 @@
 """Atlas scale benchmark: build an atlas from N synthetic episodes and
 report timing, payload sizes, and (optionally) in-browser frame rate.
 
-    python -m motionscape benchmark --n 5000 10000 20000 --out benchmarks
+    python -m kinemimic benchmark --n 5000 10000 20000 --out benchmarks
 
 Episodes are synthetic *velocity-style* observations (real feature
 pipeline, no video). Output is written to benchmarks/benchmark_<n>.json —

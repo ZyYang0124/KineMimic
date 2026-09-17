@@ -1,4 +1,4 @@
-"""MOTIONSCAPE — The Murmur: build the explorable Movement Atlas.
+"""KineMimic — The Murmur: build the explorable Movement Atlas.
 
 Scale contract (V0.2):
 
@@ -8,7 +8,7 @@ Scale contract (V0.2):
   neighbors) lives in ``meta/<episode_id>.json`` and is fetched only when
   an episode is selected (lazy media loading).
 - Source-video / replay GIFs are generated on demand by
-  ``python -m motionscape serve`` (``media.make_clip``) — never pre-rendered
+  ``python -m kinemimic serve`` (``media.make_clip``) — never pre-rendered
   for the whole dataset. A static copy of the atlas still works: clips fall
   back to in-browser trajectory replay.
 - Nearest neighbors are computed in the ORIGINAL standardized feature space
@@ -280,7 +280,7 @@ def build_atlas(episodes: list[Episode], out_dir: str | Path,
     """Build the atlas directory. Fast enough for tens of thousands of
     episodes: no video decoding, no GIF rendering, one slim JSON + small
     per-episode meta files. ``interaction`` = parsed
-    interaction_summary.json (from ``motionscape interact``), enabling
+    interaction_summary.json (from ``kinemimic interact``), enabling
     Interaction Mode context on every episode."""
     out_dir = Path(out_dir)
     (out_dir / "meta").mkdir(parents=True, exist_ok=True)
@@ -357,7 +357,7 @@ def build_atlas(episodes: list[Episode], out_dir: str | Path,
     hero_traj = _traj_pts(hero_src, 300)
 
     meta = {
-        "motionscape_version": __version__,
+        "kinemimic_version": __version__,
         "generated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "build_seconds": round(time.time() - t0, 2),
         "n_episodes": len(episodes),
@@ -382,7 +382,7 @@ def build_atlas(episodes: list[Episode], out_dir: str | Path,
         json.dumps({"meta": meta, "episodes": slim}, ensure_ascii=False),
         encoding="utf-8")
     # persist the atlas projection: query particles must land at their real
-    # position in THIS space (motionscape find-similar uses it)
+    # position in THIS space (kinemimic find-similar uses it)
     (out_dir / "atlas_projection.json").write_text(json.dumps({
         "feature_order": names, "mu": mu.tolist(), "sd": sd.tolist(),
         "components": Vt[:2].tolist(),

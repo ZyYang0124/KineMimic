@@ -1,6 +1,6 @@
 # 拍摄 → 上传 → 标注 → 图谱:你的蛛蚁视频工作流
 
-这是 MOTIONSCAPE 的主产品路径:拍摄蜘蛛与蚂蚁同框活动 → 一条命令 →
+这是 KineMimic 的主产品路径:拍摄蜘蛛与蚂蚁同框活动 → 一条命令 →
 人工 QC + 标注 → 可探索的 Movement Atlas。
 
 ## 1. 拍摄建议(让管线可靠)
@@ -19,12 +19,12 @@
 
 ```bash
 # 单个视频(--site 记入采样层级: Site→Session→Video→Episode)
-python -m motionscape ingest D:/field/video01.mp4 --id siteA_2026-09-17_01 --site siteA
+python -m kinemimic ingest D:/field/video01.mp4 --id siteA_2026-09-17_01 --site siteA
 
 # 多个视频一次处理(同一研究地点/条件)
-python -m motionscape ingest vid1.mp4 vid2.mp4 vid3.mp4 \
+python -m kinemimic ingest vid1.mp4 vid2.mp4 vid3.mp4 \
     --id siteA_01 siteA_02 siteA_03 --site siteA --session 2026-09-17 \
-    --store motionscape_runs/mysite
+    --store kinemimic_runs/mysite
 ```
 
 输出:
@@ -39,7 +39,7 @@ python -m motionscape ingest vid1.mp4 vid2.mp4 vid3.mp4 \
 `SCIENTIFIC_ASSUMPTIONS.md` §3):
 
 ```bash
-python -m motionscape annotate motionscape_runs/mysite/runs/<run_id>/episodes.jsonl
+python -m kinemimic annotate kinemimic_runs/mysite/runs/<run_id>/episodes.jsonl
 # → http://127.0.0.1:8692   键盘:S/A/O/R/U 标注,X/F/H/E/T/B QC,每键即存
 ```
 
@@ -49,7 +49,7 @@ python -m motionscape annotate motionscape_runs/mysite/runs/<run_id>/episodes.js
 ## 4. 打开图谱
 
 ```bash
-python -m motionscape serve motionscape_runs/mysite/runs/<run_id>/atlas
+python -m kinemimic serve kinemimic_runs/mysite/runs/<run_id>/atlas
 # → http://127.0.0.1:8694  片段按需从原视频生成
 ```
 
@@ -66,7 +66,7 @@ python -m motionscape serve motionscape_runs/mysite/runs/<run_id>/atlas
 | `--n-motifs` | 8 | Motion Dictionary 的模式数 |
 | `--site` / `--session` | — | 采样层级标签(统计去伪重复用) |
 
-检测器内部参数(阈值/目标大小范围)在 `motionscape/detect.py` 顶部,
+检测器内部参数(阈值/目标大小范围)在 `kinemimic/detect.py` 顶部,
 若漏检/误检可按场地调整;每段 episode 的处理历史会记录所用模型版本。
 
 ## 6. 比较(标注完成后才有生物学意义)

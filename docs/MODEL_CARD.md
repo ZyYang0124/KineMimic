@@ -1,4 +1,4 @@
-# MODEL CARD — MOTIONSCAPE Encoders (V0.4 baseline)
+# MODEL CARD — KineMimic Encoders (V0.4 baseline)
 
 ## What the models are for
 

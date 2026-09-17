@@ -1,11 +1,11 @@
-"""MOTIONSCAPE command-line interface.
+"""KineMimic command-line interface.
 
-    python -m motionscape demo                          # synthetic end-to-end tour
-    python -m motionscape ingest VIDEO --id ID          # real videos -> run + atlas
-    python -m motionscape annotate episodes.jsonl       # human QC + biological labels
-    python -m motionscape atlas  episodes.jsonl         # (re)build the atlas
-    python -m motionscape serve   <atlas_dir>           # atlas + on-demand media
-    python -m motionscape benchmark --n 5000 10000      # scale benchmark
+    python -m kinemimic demo                          # synthetic end-to-end tour
+    python -m kinemimic ingest VIDEO --id ID          # real videos -> run + atlas
+    python -m kinemimic annotate episodes.jsonl       # human QC + biological labels
+    python -m kinemimic atlas  episodes.jsonl         # (re)build the atlas
+    python -m kinemimic serve   <atlas_dir>           # atlas + on-demand media
+    python -m kinemimic benchmark --n 5000 10000      # scale benchmark
 """
 
 from __future__ import annotations
@@ -47,9 +47,9 @@ def _finish(store: EpisodeStore, all_eps, run_dir: Path, n_motifs: int):
                         summary=json.loads((run_dir / "summary.json").read_text(encoding="utf-8")),
                         run_provenance=json.loads((run_dir / "manifest.json").read_text(encoding="utf-8")))
     _print_summary(run_dir)
-    print(f"  next:     python -m motionscape annotate {run_dir / 'episodes.jsonl'}")
+    print(f"  next:     python -m kinemimic annotate {run_dir / 'episodes.jsonl'}")
     print(f"  atlas:    {atlas}")
-    print(f"  open:     python -m motionscape serve {run_dir / 'atlas'}")
+    print(f"  open:     python -m kinemimic serve {run_dir / 'atlas'}")
 
 
 def cmd_demo(args):
@@ -124,7 +124,7 @@ def cmd_atlas(args):
     out = build_atlas(eps, args.out, summary=s or None, interaction=ia)
     print(f"atlas: {out} ({len(eps)} episodes"
           + (f", interaction: {ia['n_records']} pairs)" if ia else ")"))
-    print(f"open:  python -m motionscape serve {args.out} --episodes {args.episodes}")
+    print(f"open:  python -m kinemimic serve {args.out} --episodes {args.episodes}")
 
 
 def cmd_viz(args):
@@ -175,7 +175,7 @@ def cmd_interact(args):
     if "speed" not in cmp_ and "response" not in cmp_:
         print("  Siler x ant comparison: not enough annotated episodes in both contexts")
     print(f"  note: {result['provenance']['parameters']['labels_note']}")
-    print(f"  next: python -m motionscape atlas {run_dir / 'episodes.jsonl'} "
+    print(f"  next: python -m kinemimic atlas {run_dir / 'episodes.jsonl'} "
           f"--out {run_dir / 'atlas_v2'}  (Interaction Mode appears automatically)")
 
 
@@ -269,16 +269,16 @@ def cmd_eval_retrieval(args):
 
 def cmd_benchmark(args):
     from .benchmark import run as run_bench
-    print("MOTIONSCAPE atlas benchmark (synthetic velocity-style episodes)")
+    print("KineMimic atlas benchmark (synthetic velocity-style episodes)")
     run_bench(args.n, out_dir=args.out, seed=args.seed)
 
 
 def main(argv=None):
-    p = argparse.ArgumentParser(prog="motionscape")
+    p = argparse.ArgumentParser(prog="kinemimic")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     d = sub.add_parser("demo", help="synthetic end-to-end tour")
-    d.add_argument("--out", default="motionscape_runs")
+    d.add_argument("--out", default="kinemimic_runs")
     d.add_argument("--seconds", type=float, default=30, help="per video")
     d.add_argument("--min-episode-s", type=float, default=3.0)
     d.add_argument("--n-motifs", type=int, default=6)
@@ -287,20 +287,20 @@ def main(argv=None):
     sh = sub.add_parser("shamble", help="build atlas from Shamble 2017 Dryad data")
     sh.add_argument("--mat", default="data/external/shamble2017/OverallMovement/OverallMovement/data/data_folders_5_to_18_v3.mat")
     sh.add_argument("--videos", default="data/external/shamble2017/OverallMovement/OverallMovement/example videos")
-    sh.add_argument("--store", default="motionscape_runs")
+    sh.add_argument("--store", default="kinemimic_runs")
     sh.add_argument("--n-motifs", type=int, default=8)
     sh.set_defaults(fn=cmd_shamble)
 
     z = sub.add_parser("zeng", help="gait universe from Zeng 2023 raw gait data")
     z.add_argument("--xlsx", default="data/external/Zeng_et_al_2023_Gait analysis_raw data.xlsx")
-    z.add_argument("--store", default="motionscape_runs/zeng")
+    z.add_argument("--store", default="kinemimic_runs/zeng")
     z.add_argument("--n-motifs", type=int, default=8)
     z.set_defaults(fn=cmd_zeng)
 
     g = sub.add_parser("ingest", help="process real videos")
     g.add_argument("video", nargs="+")
     g.add_argument("--id", nargs="+", required=True)
-    g.add_argument("--store", default="motionscape_runs")
+    g.add_argument("--store", default="kinemimic_runs")
     g.add_argument("--site", default=None, help="sampling-hierarchy site id")
     g.add_argument("--session", default=None, help="sampling-hierarchy session id")
     g.add_argument("--min-episode-s", type=float, default=3.0)

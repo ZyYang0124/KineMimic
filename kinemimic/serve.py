@@ -1,6 +1,6 @@
 """Local atlas server: static files + on-demand episode media.
 
-    python -m motionscape serve <atlas_dir> --episodes <episodes.jsonl>
+    python -m kinemimic serve <atlas_dir> --episodes <episodes.jsonl>
 
 Endpoints:
     GET  /                      atlas/index.html
@@ -216,7 +216,7 @@ def make_handler(server: AtlasServer):
                     return self._json({"error": "unknown episode"}, 404)
                 return self._file(gif, "image/gif")
             if p == "/api/info":
-                return self._json({"server": "motionscape-serve", "atlas": server.atlas_dir.name,
+                return self._json({"server": "kinemimic-serve", "atlas": server.atlas_dir.name,
                                    "n_episodes_meta": len(server._episodes()),
                                    "clip_endpoint": True,
                                    "reference": (str(server.reference_dir)
@@ -277,7 +277,7 @@ def serve_atlas(atlas_dir: str | Path, episodes_path: str | Path | None = None,
                 port: int = 8694, reference_dir: str | Path | None = None) -> None:
     server = AtlasServer(atlas_dir, episodes_path, reference_dir=reference_dir)
     httpd = ThreadingHTTPServer(("127.0.0.1", port), make_handler(server))
-    print(f"MOTIONSCAPE atlas: http://127.0.0.1:{port}/  (Ctrl+C to stop)")
+    print(f"KineMimic atlas: http://127.0.0.1:{port}/  (Ctrl+C to stop)")
     print(f"  atlas dir: {server.atlas_dir}")
     print(f"  episodes:  {server.episodes_path or '(media disabled — static mode)'}")
     print(f"  reference: {server.reference_dir or '(Find Similar upload disabled)'}")

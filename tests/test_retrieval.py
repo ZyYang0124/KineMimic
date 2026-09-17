@@ -12,12 +12,12 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from motionscape.encoder import KinematicPCAEncoder, ShapeSeriesEncoder
-from motionscape.query import build_reference, load_projection, project_to_atlas, run_query
-from motionscape.retrieval import (IndexPolicy, ReferenceIndex, ood_flag,
+from kinemimic.encoder import KinematicPCAEncoder, ShapeSeriesEncoder
+from kinemimic.query import build_reference, load_projection, project_to_atlas, run_query
+from kinemimic.retrieval import (IndexPolicy, ReferenceIndex, ood_flag,
                                    similarity_breakdown, taxa_retrieval)
-from motionscape.schema import Episode
-from motionscape.synth import generate_paths, render_video
+from kinemimic.schema import Episode
+from kinemimic.synth import generate_paths, render_video
 
 
 def _longest_finite_run(p):
@@ -39,7 +39,7 @@ def _longest_finite_run(p):
 
 def _archetype_episodes(n_each=4, seed0=0):
     """ant / siler synthetic episodes with precomputed features."""
-    from motionscape.features import trajectory_features
+    from kinemimic.features import trajectory_features
     eps = []
     for arch_i, arch in enumerate(("ant", "siler")):
         for i in range(n_each):
@@ -218,7 +218,7 @@ def test_atlas_projection_gives_real_positions(tmp_path):
     eps = _archetype_episodes(4, seed0=77)
     idx = build_reference(eps, tmp_path / "ref", dim=6, min_episodes=6)["index"]
     # a fake atlas projection over the same features
-    from motionscape.features import feature_matrix
+    from kinemimic.features import feature_matrix
     X, names = feature_matrix(eps)
     mu, sd = X.mean(0), X.std(0) + 1e-9
     _, _, Vt = np.linalg.svd((X - mu) / sd, full_matrices=False)
@@ -229,7 +229,7 @@ def test_atlas_projection_gives_real_positions(tmp_path):
     pos = project_to_atlas(eps[0].trajectory_features, loaded)
     assert len(pos) == 2 and all(np.isfinite(v) for v in pos)
     # the reference episode projects near its own embedding's top components
-    from motionscape.encoder import KinematicPCAEncoder
+    from kinemimic.encoder import KinematicPCAEncoder
     enc = KinematicPCAEncoder.load(tmp_path / "ref", "kinematic-pca")
     z = enc.transform_one(eps[0])
     assert np.isfinite(z).all()
@@ -243,7 +243,7 @@ def test_motif_retrieval_ranks_known_motif(tmp_path):
     enc = KinematicPCAEncoder(dim=6).load if False else None
     enc = KinematicPCAEncoder(dim=6).fit(eps)
     z0 = enc.transform_one(eps[0])                  # motif 0 member
-    from motionscape.retrieval import retrieve
+    from kinemimic.retrieval import retrieve
     res = retrieve([eps[0]], z0.reshape(1, -1), idx, enc, k=3)
     assert res["motif_hits"], "motif hits must be returned"
     assert all(0 <= m["similarity"] <= 1 for m in res["motif_hits"])

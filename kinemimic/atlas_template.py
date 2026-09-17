@@ -1,4 +1,4 @@
-"""MOTIONSCAPE — The Murmur front-end (self-contained, no build step).
+"""KineMimic — The Murmur front-end (self-contained, no build step).
 
 Visual contract (what every channel means — nothing is decoration):
 
@@ -22,7 +22,7 @@ TEMPLATE = r"""<!DOCTYPE html>
 <html lang="zh">
 <head>
 <meta charset="utf-8">
-<title>MOTIONSCAPE — The Murmur · An atlas of animal movement</title>
+<title>KineMimic — The Murmur · An atlas of animal movement</title>
 <style>
  :root{--bg:#06090e;--ink:#d8e2ec;--dim:#64798d;--line:#16212d;--accent:#9fe8df;--panel:#0a1017ee}
  *{box-sizing:border-box}
@@ -122,7 +122,7 @@ TEMPLATE = r"""<!DOCTYPE html>
 <canvas id="galaxy"></canvas>
 
 <header>
- <div id="brand">MOTIONSCAPE<small>an explorable ant-mimicry behavioral landscape · The Murmur</small></div>
+ <div id="brand">KineMimic<small>an explorable ant-mimicry behavioral landscape · The Murmur</small></div>
  <div id="dataset"></div>
  <div class="sp"></div>
  <div class="modeseg" id="modeseg" style="display:none">
@@ -145,7 +145,7 @@ TEMPLATE = r"""<!DOCTYPE html>
 <div id="hero">
  <canvas id="heroCv" width="1120" height="560"></canvas>
  <div id="heroQ">How does a spider move like an ant?</div>
- <div id="heroSub">MOTIONSCAPE · The Murmur — an explorable behavioral phenotype space
+ <div id="heroSub">KineMimic · The Murmur — an explorable behavioral phenotype space
    for the evolution of ant mimicry.<br>
    先看运动本身。模型、拟态者与对照的身份,由你决定何时揭示。</div>
  <div id="heroHint">click to enter · 点击进入</div>
@@ -741,7 +741,7 @@ function renderInteraction(){
   </table>
   <div class="muted">Δ = median(with ants) − median(without). p = episode-shuffle permutation p.
    Distance-response across radii guards against one arbitrary threshold.</div>`
-  :`<div class="muted">Not enough episodes in both contexts yet — annotate more Siler episodes (workbench) and re-run <b>motionscape interact</b>.</div>`}
+  :`<div class="muted">Not enough episodes in both contexts yet — annotate more Siler episodes (workbench) and re-run <b>kinemimic interact</b>.</div>`}
   ${cmp.d_ant&&cmp.d_ant.note?`<div class="muted" style="margin-top:8px">${esc(cmp.d_ant.note)}</div>`:''}
   <div class="ctxline" style="margin-top:10px"><b>View:</b> Interaction mode shades Siler particles by their real social context —
    hollow = no ants nearby during the episode (from the same source video).</div>
@@ -799,7 +799,7 @@ function renderDictionary(){
          toast('saved ✓');renderDictionary();}});
    }else{META.motif_annotations=META.motif_annotations||{};
      META.motif_annotations[String(sel_m)]={name,notes,annotator,timestamp:new Date().toISOString(),local:true};
-     toast('saved locally — run motionscape serve to persist');renderDictionary();}
+     toast('saved locally — run kinemimic serve to persist');renderDictionary();}
  };
 }
 window.motifClick=function(m){motifSel=(motifSel===m)?-1:m;renderDictionary();};
@@ -876,8 +876,8 @@ function renderData(){
   <div class="muted" style="margin-top:10px">Run provenance</div>
   <div class="prov">${esc(JSON.stringify(META.provenance,null,1).slice(0,900))}</div>
   <div class="muted" style="margin-top:10px">Atlas build</div>
-  <div class="prov">MOTIONSCAPE v${META.motionscape_version} · built ${META.generated_utc} in ${META.build_seconds}s
-\nserver media: ${serverMode?'on (clips generated on demand)':'off — run: python -m motionscape serve'}</div>`;
+  <div class="prov">KineMimic v${META.kinemimic_version} · built ${META.generated_utc} in ${META.build_seconds}s
+\nserver media: ${serverMode?'on (clips generated on demand)':'off — run: python -m kinemimic serve'}</div>`;
 }
 function toast(t){const e=document.createElement('div');e.textContent=t;
  e.style.cssText='position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#14303a;color:#c8f2ec;padding:6px 16px;border-radius:16px;font-size:13px;z-index:30;transition:opacity .4s';
@@ -897,8 +897,8 @@ function showQueryHelp(){
  panel.innerHTML=`<h1>Find Similar</h1>
   <div class="tabbar">${tabbar('data')}</div>
   <div class="muted">Drop in a video and see what moves like it.</div>
-  <div class="prov">python -m motionscape find-similar VIDEO.mp4 --query-id my_query \
-    --reference motionscape_runs/reference --atlas &lt;atlas_dir&gt;</div>
+  <div class="prov">python -m kinemimic find-similar VIDEO.mp4 --query-id my_query \
+    --reference kinemimic_runs/reference --atlas &lt;atlas_dir&gt;</div>
   <div class="muted" style="margin-top:8px">Then reload this page — your movement enters the atlas.
    Or start the server with --reference to upload from here.</div>`;
  openPanel();

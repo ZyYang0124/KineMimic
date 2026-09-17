@@ -1,15 +1,14 @@
-# MOTIONSCAPE — Design Document
+# KineMimic — Design Document
 
 ## Core positioning (fixed)
 
 > 用可探索的行为表型空间,研究不同拟蚁类群如何独立演化出
 > "像蚂蚁一样运动"的能力。
-> (Using an explorable behavioral phenotype space to understand how
-> ant-mimicking lineages independently evolve to move like ants.)
+> Slogan: Exploring how ant mimics evolve to move like ants.
 
-MOTIONSCAPE / **The Murmur** / *Ant Mimicry*. The codebase is
+KineMimic / **The Murmur** / *Ant Mimicry*. The codebase is
 species-agnostic in plumbing, but the scientific scope is deliberately
-bounded: **MOTIONSCAPE is not intended to compare all animal movement in
+bounded: **KineMimic is not intended to compare all animal movement in
 a single universal latent space.** It focuses on biologically comparable
 locomotor systems relevant to ant mimicry. Any proposed feature must
 answer: does this help us understand how ant-mimicking lineages
@@ -67,7 +66,7 @@ Video → Detection → Movement Episode → Trajectory ┬→ Features (interpr
 
 ## The movement episode (fundamental unit)
 
-`Episode` (motionscape/schema.py): episode_id, source_video_id/path, frame
+`Episode` (kinemimic/schema.py): episode_id, source_video_id/path, frame
 range, fps, calibration, frames + centroids + bbox elongations +
 confidences, trajectory QC, sampling hierarchy (site_id, session_id),
 environment, annotation fields, features, embedding, motif, and
@@ -170,7 +169,7 @@ fingerprint, motif occupancy.
 
 Scale: `data.json` ~0.32 KB/episode; per-episode detail in
 `meta/<id>.json`, fetched on selection; media generated on demand by
-`motionscape serve` (cached); one canvas for all particles. Benchmarks in
+`kinemimic serve` (cached); one canvas for all particles. Benchmarks in
 `benchmarks/` and `docs/ATLAS.md`.
 
 ## Mimicry measurement

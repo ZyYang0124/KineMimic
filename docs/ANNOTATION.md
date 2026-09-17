@@ -13,7 +13,7 @@ claims.
 ## Launch
 
 ```bash
-python -m motionscape annotate motionscape_runs/fieldtest/runs/<run_id>/episodes.jsonl
+python -m kinemimic annotate kinemimic_runs/fieldtest/runs/<run_id>/episodes.jsonl
 # → http://127.0.0.1:8692
 ```
 
@@ -85,8 +85,8 @@ Re-run the analysis; human labels now drive the overlays and the mimicry
 fingerprint:
 
 ```bash
-python -m motionscape atlas <run>/episodes.jsonl --out <run>/atlas_v2
-python -m motionscape serve <run>/atlas_v2
+python -m kinemimic atlas <run>/episodes.jsonl --out <run>/atlas_v2
+python -m kinemimic serve <run>/atlas_v2
 ```
 
 Progress you can quote in a paper: the workbench header shows

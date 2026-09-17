@@ -5,7 +5,7 @@ millimeter-scale centroid tracking (``Rcm_mm``), species labels, original
 GoPro file names and frame ranges -- a perfect episode source with
 end-to-end provenance and no detection step required.
 
-Species mapping (dataset labels -> MOTIONSCAPE labels):
+Species mapping (dataset labels -> KineMimic labels):
     Myrmarachne formicaria -> mimic (ant-mimicking jumping spider)
     Salticus senicus       -> other_spider (non-mimetic control)
     ANT *                  -> ant

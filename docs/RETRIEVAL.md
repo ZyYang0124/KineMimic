@@ -117,11 +117,11 @@ with your video (normalized or real-time playback).
 ## Running it
 
 ```bash
-python -m motionscape build-reference RUN_A/episodes.jsonl RUN_B/episodes.jsonl \
-    --out motionscape_runs/reference --dim 10
-python -m motionscape find-similar NEW_VIDEO.mp4 --query-id my_query \
-    --reference motionscape_runs/reference --atlas <atlas_dir>
-python -m motionscape eval-retrieval motionscape_runs/reference
+python -m kinemimic build-reference RUN_A/episodes.jsonl RUN_B/episodes.jsonl \
+    --out kinemimic_runs/reference --dim 10
+python -m kinemimic find-similar NEW_VIDEO.mp4 --query-id my_query \
+    --reference kinemimic_runs/reference --atlas <atlas_dir>
+python -m kinemimic eval-retrieval kinemimic_runs/reference
 # or serve with upload enabled:
-python -m motionscape serve <atlas_dir> --reference motionscape_runs/reference
+python -m kinemimic serve <atlas_dir> --reference kinemimic_runs/reference
 ```

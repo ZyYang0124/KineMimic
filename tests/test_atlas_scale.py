@@ -9,12 +9,12 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from motionscape.atlas import nearest_neighbors, build_atlas
-from motionscape.benchmark import synthetic_episodes
-from motionscape.embedding import PCAEmbedder
-from motionscape.features import feature_matrix
-from motionscape.schema import Episode
-from motionscape.zeng import velocity_features
+from kinemimic.atlas import nearest_neighbors, build_atlas
+from kinemimic.benchmark import synthetic_episodes
+from kinemimic.embedding import PCAEmbedder
+from kinemimic.features import feature_matrix
+from kinemimic.schema import Episode
+from kinemimic.zeng import velocity_features
 
 
 def _eps_with_features(n=30, seed=0):
@@ -53,9 +53,9 @@ def test_embedding_is_blind_to_labels():
 def test_pipeline_embedding_ignores_annotation(tmp_path):
     """analyze() twice on the same movements with different human labels ->
     identical embeddings (blind space), different overlays."""
-    from motionscape.pipeline import analyze
-    from motionscape.store import EpisodeStore
-    from motionscape.annotation import AnnotationRecord, append_record
+    from kinemimic.pipeline import analyze
+    from kinemimic.store import EpisodeStore
+    from kinemimic.annotation import AnnotationRecord, append_record
 
     store = EpisodeStore(tmp_path / "s1")
     run1 = analyze(store, _eps_with_features(24))
@@ -77,7 +77,7 @@ def test_pipeline_embedding_ignores_annotation(tmp_path):
 
 
 def test_nearest_neighbors_match_bruteforce():
-    from motionscape.zeng import velocity_features
+    from kinemimic.zeng import velocity_features
     eps = _eps_with_features(120)
     X, _ = feature_matrix(eps)
     idx, dist = nearest_neighbors(X, k=5)
@@ -123,7 +123,7 @@ def test_lazy_meta_loading(tmp_path):
 
 
 def test_sampling_hierarchy_blocks_pseudoreplication():
-    from motionscape.hierarchy import hierarchy_summary, hierarchical_bootstrap
+    from kinemimic.hierarchy import hierarchy_summary, hierarchical_bootstrap
     eps = synthetic_episodes(200, seed=3)
     for i, e in enumerate(eps):
         e.site_id = f"site_{i // 100}"          # 2 sites
@@ -139,7 +139,7 @@ def test_sampling_hierarchy_blocks_pseudoreplication():
 
 
 def test_motif_annotation_separate_from_machine_id(tmp_path):
-    from motionscape.serve import AtlasServer
+    from kinemimic.serve import AtlasServer
     eps = synthetic_episodes(20, seed=4)
     build_atlas(eps, tmp_path / "atlas")
     srv = AtlasServer(tmp_path / "atlas", None)

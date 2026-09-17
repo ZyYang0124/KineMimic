@@ -4,13 +4,13 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from motionscape.schema import Episode
-from motionscape.features import trajectory_features, feature_matrix
-from motionscape.synth import generate_paths
-from motionscape.track import tracks_to_episodes, Track
-from motionscape.classify import classify_episode, mimicry_fingerprint
-from motionscape.embedding import PCAEmbedder
-from motionscape.motifs import find_motifs
+from kinemimic.schema import Episode
+from kinemimic.features import trajectory_features, feature_matrix
+from kinemimic.synth import generate_paths
+from kinemimic.track import tracks_to_episodes, Track
+from kinemimic.classify import classify_episode, mimicry_fingerprint
+from kinemimic.embedding import PCAEmbedder
+from kinemimic.motifs import find_motifs
 
 
 def test_features_separate_archetypes():

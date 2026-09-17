@@ -1,6 +1,6 @@
 # The Atlas — The Murmur
 
-The deliverable of MOTIONSCAPE is not a dashboard; it is a **movement space
+The deliverable of KineMimic is not a dashboard; it is a **movement space
 you can walk into**. This document explains what you see, why it is
 trustworthy, and how it scales.
 
@@ -67,7 +67,7 @@ not data.
 ## Opening an atlas
 
 ```bash
-python -m motionscape serve <run>/atlas_v2 --episodes <run>/episodes.jsonl
+python -m kinemimic serve <run>/atlas_v2 --episodes <run>/episodes.jsonl
 # → http://127.0.0.1:8694
 ```
 
@@ -83,7 +83,7 @@ minimal metadata); per-episode detail lives in `meta/<id>.json` and is
 fetched only on selection; no media is pre-rendered; particles render on
 one canvas (no DOM per particle); nearest neighbors use a k-d tree.
 
-Measured (`python -m motionscape benchmark`, recorded in `benchmarks/`):
+Measured (`python -m kinemimic benchmark`, recorded in `benchmarks/`):
 
 | episodes | atlas build | NN (feature space) | data.json |
 |---:|---:|---:|---:|

@@ -14,10 +14,10 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from motionscape.interaction import (SceneWindow, analyze_run, build_scene_windows,
+from kinemimic.interaction import (SceneWindow, analyze_run, build_scene_windows,
                                      circular_mean_deg, concurrent_groups,
                                      neighbor_context, pairwise_geometry, write_outputs)
-from motionscape.schema import Episode
+from kinemimic.schema import Episode
 
 
 def mk_ep(eid, frames_xy, fps=30.0, video="v1", label=None, human=False,

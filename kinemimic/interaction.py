@@ -1,6 +1,6 @@
 """Interaction Layer (V0): scenes, pairwise geometry, social context.
 
-Layer 2 of MOTIONSCAPE's science stack:
+Layer 2 of KineMimic's science stack:
 
     Movement  (how does one animal move?            — episodes, features)
     Interaction  (how does movement depend on another animal? — this module)

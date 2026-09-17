@@ -1,4 +1,4 @@
-"""Biological roles: the comparative framework of MOTIONSCAPE.
+"""Biological roles: the comparative framework of KineMimic.
 
 Core scientific question (fixed):
 

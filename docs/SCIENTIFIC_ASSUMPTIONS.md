@@ -1,11 +1,11 @@
 # SCIENTIFIC ASSUMPTIONS
 
-Every claim MOTIONSCAPE's interface makes rests on the assumptions below.
+Every claim KineMimic's interface makes rests on the assumptions below.
 They are stated so a reviewer can challenge any of them individually.
 
 ## 0. What the project is — and is not
 
-MOTIONSCAPE studies one specific, repeatedly evolved phenomenon:
+KineMimic studies one specific, repeatedly evolved phenomenon:
 behavioral ant mimicry across independent lineages. Its scope is bounded
 by that question. It is **not** a universal animal-movement comparator:
 taxa whose scale, locomotor apparatus, medium, and ecology differ too

@@ -11,9 +11,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from motionscape.roles import (BIOLOGICAL_ROLES, RoleRegistry, TaxonRole,
+from kinemimic.roles import (BIOLOGICAL_ROLES, RoleRegistry, TaxonRole,
                                default_registry_path)
-from motionscape.schema import Episode
+from kinemimic.schema import Episode
 
 
 def _ep(species=None, label="unknown"):
@@ -87,8 +87,8 @@ def test_load_missing_file_yields_defaults(tmp_path):
 
 def test_importers_assign_roles():
     """Real importers: gold labels resolve to model / mimic / control."""
-    from motionscape.shamble import load_shamble_episodes
-    from motionscape.zeng import load_zeng_episodes
+    from kinemimic.shamble import load_shamble_episodes
+    from kinemimic.zeng import load_zeng_episodes
     sh = load_shamble_episodes(
         "data/external/shamble2017/OverallMovement/OverallMovement/data/"
         "data_folders_5_to_18_v3.mat")
@@ -106,9 +106,9 @@ def test_importers_assign_roles():
 def test_atlas_embeds_roles_for_reveal(tmp_path):
     """The atlas meta carries taxon->role mapping and per-episode roles so
     the UI can Reveal roles, not only species."""
-    from motionscape.atlas import build_atlas
-    from motionscape.benchmark import synthetic_episodes
-    from motionscape.roles import RoleRegistry
+    from kinemimic.atlas import build_atlas
+    from kinemimic.benchmark import synthetic_episodes
+    from kinemimic.roles import RoleRegistry
     eps = synthetic_episodes(24, seed=5)
     for e in eps:
         e.bio_label = "ant"                      # exercise the role resolver

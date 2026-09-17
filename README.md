@@ -1,15 +1,15 @@
-# MOTIONSCAPE
+# KineMimic
 
-**Exploring how ant-mimicking lineages independently evolve to move like ants.**
+**Exploring how ant mimics evolve to move like ants.**
 
 An explorable behavioral phenotype space for the evolution of ant mimicry.
 
 > 核心理念:用可探索的行为表型空间,研究不同拟蚁类群如何独立演化出
 > "像蚂蚁一样运动"的能力。
 
-## 1. What is MOTIONSCAPE?
+## 1. What is KineMimic?
 
-MOTIONSCAPE is a scientific instrument, not a general animal-tracking
+KineMimic is a scientific instrument, not a general animal-tracking
 tool. It turns naturalistic video into **movement phenotypes** —
 quantitative descriptions of how animals move — and organizes them into
 an explorable behavioral space, so that behavioral mimicry can be studied
@@ -57,7 +57,7 @@ mimic is to "the average ant", but **which regions of the ant behavioral
 distribution mimics occupy**. Candidate ant-like behavioral regions must
 emerge from the data; they are never defined in advance.
 
-**Scope boundary.** MOTIONSCAPE is not intended to compare all animal
+**Scope boundary.** KineMimic is not intended to compare all animal
 movement in a single universal latent space. It focuses on biologically
 comparable locomotor systems relevant to ant mimicry.
 
@@ -158,12 +158,12 @@ Scientific assumptions and their limits: docs/SCIENTIFIC_ASSUMPTIONS.md.
 
 ```bash
 pip install -e .
-python -m motionscape demo                      # synthetic end-to-end tour
-python -m motionscape serve <run>/atlas         # explore the atlas
-python -m motionscape annotate <run>/episodes.jsonl
-python -m motionscape interact <run>            # interaction context
-python -m motionscape build-reference RUN/episodes.jsonl --out reference
-python -m motionscape find-similar NEW.mp4 --query-id q1 \
+python -m kinemimic demo                      # synthetic end-to-end tour
+python -m kinemimic serve <run>/atlas         # explore the atlas
+python -m kinemimic annotate <run>/episodes.jsonl
+python -m kinemimic interact <run>            # interaction context
+python -m kinemimic build-reference RUN/episodes.jsonl --out reference
+python -m kinemimic find-similar NEW.mp4 --query-id q1 \
     --reference reference --atlas <atlas_dir>   # drop in a video
 ```
 

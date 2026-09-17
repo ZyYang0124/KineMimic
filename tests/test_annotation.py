@@ -8,11 +8,11 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from motionscape.annotation import (AnnotationRecord, append_record, apply_log,
+from kinemimic.annotation import (AnnotationRecord, append_record, apply_log,
                                     apply_record, read_log, summary)
-from motionscape.classify import classify_episode, label_episodes
-from motionscape.schema import BIO_LABELS, QC_STATES, Episode
-from motionscape.synth import generate_paths
+from kinemimic.classify import classify_episode, label_episodes
+from kinemimic.schema import BIO_LABELS, QC_STATES, Episode
+from kinemimic.synth import generate_paths
 
 
 def mk_ep(label="unknown"):

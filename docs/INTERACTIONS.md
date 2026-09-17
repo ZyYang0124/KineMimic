@@ -1,6 +1,6 @@
 # Interaction Layer (V0)
 
-Layer 2 of MOTIONSCAPE's science stack:
+Layer 2 of KineMimic's science stack:
 
 ```
 Movement     how does one animal move?              (episodes, features, space)
@@ -8,7 +8,7 @@ Interaction  how does movement depend on another?   (this document)
 Behavior     how are movements organized?           (future — grammar, states)
 ```
 
-MOTIONSCAPE must not only split animals into isolated trajectories. Real
+KineMimic must not only split animals into isolated trajectories. Real
 animals live inside a context of other animals, space and time. The
 Interaction Layer puts every Movement Episode back into the world it came
 from — without abandoning the episode as the unit of analysis.
@@ -135,10 +135,10 @@ exists.
 
 ## Labels
 
-Interaction read-outs follow the same rule as the rest of MOTIONSCAPE:
+Interaction read-outs follow the same rule as the rest of KineMimic:
 machine labels are pre-screening; only human-confirmed labels are ground
 truth. The summary records how many episodes are human-labeled, and
-`motionscape interact --require-human` restricts taxon context to
+`kinemimic interact --require-human` restricts taxon context to
 human-confirmed episodes outright.
 
 ## Interaction Mode in the atlas
@@ -173,10 +173,10 @@ under test, never a preset conclusion.
 ## Running it
 
 ```bash
-python -m motionscape interact <run_dir> --window-s 2 --stride-s 1
+python -m kinemimic interact <run_dir> --window-s 2 --stride-s 1
 # optional: --radius 150 --require-human --n-shuffle 500
-python -m motionscape atlas <run_dir>/episodes.jsonl --out <run_dir>/atlas_v2
-python -m motionscape serve <run_dir>/atlas_v2 --episodes <run_dir>/episodes.jsonl
+python -m kinemimic atlas <run_dir>/episodes.jsonl --out <run_dir>/atlas_v2
+python -m kinemimic serve <run_dir>/atlas_v2 --episodes <run_dir>/episodes.jsonl
 ```
 
 Outputs: `interactions.jsonl`, `scene_windows.jsonl`,
