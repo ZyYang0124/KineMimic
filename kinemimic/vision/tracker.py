@@ -230,7 +230,6 @@ class TwoStageTracker:
                             a, frame_idx, "merge",
                             f"{len(converging)} tracks converge on one detection",
                             involved=ids)
-                        self.active.remove(a)
                     survivors = [a for a in survivors if a not in converging]
 
         for act, det in assign_acts:
@@ -281,9 +280,9 @@ class TwoStageTracker:
             gap = frame_idx - act.last_frame
             act.tracklet.gap_events.append(
                 {"frame": act.last_frame, "length": int(gap)})
+            p0 = np.array([act.tracklet.points[-1].x, act.tracklet.points[-1].y])
+            p1 = np.asarray(det.centroid, float)
             if gap <= self.cfg.max_interpolated_gap:
-                p0 = np.array([act.tracklet.points[-1].x, act.tracklet.points[-1].y])
-                p1 = np.asarray(det.centroid, float)
                 for k in range(1, gap):
                     q = p0 + (p1 - p0) * k / gap
                     act.tracklet.add_point(TrackPoint(
@@ -294,8 +293,7 @@ class TwoStageTracker:
                 frame_idx=frame_idx, x=det.centroid[0], y=det.centroid[1],
                 state="observed", bbox=det.bbox, confidence=det.confidence,
                 association_confidence=assoc, cls=det.cls)
-            prev = act.tracklet.points[-1]
-            act.velocity = (p1 - np.array([prev.x, prev.y])) / gap
+            act.velocity = (p1 - p0) / gap
         else:
             new_pt = TrackPoint(
                 frame_idx=frame_idx, x=det.centroid[0], y=det.centroid[1],

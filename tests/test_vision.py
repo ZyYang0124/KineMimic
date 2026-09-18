@@ -166,6 +166,25 @@ def test_collision_merges_then_splits():
                 f"tracklet {t.tracklet_id} spanned the collision: false merge!"
 
 
+def test_cluster_detection_between_two_tracks_splits_not_crashes():
+    """Real dense footage puts a detection between two tracks at once.
+    Both tracks converge on it: the collision path must terminate them
+    with merge events, not guess which ant it is (and not crash on the
+    tracklet bookkeeping)."""
+    frames = [(f, [det(f, 100, 100), det(f, 134, 100)]) for f in range(5)]
+    frames.append((5, [det(5, 100, 100), det(5, 134, 100), det(5, 117, 100)]))
+    frames += [(f, [det(f, 100, 100), det(f, 134, 100), det(f, 117, 100)])
+               for f in range(6, 40)]
+    tracklets = run_tracker(frames)
+    merges = [e for t in tracklets for e in t.ambiguity_events
+              if e.kind == "merge"]
+    assert merges, "converging tracks must be flagged as a merge ambiguity"
+    for t in tracklets:
+        sides = {round(p.x) for p in t.points}
+        assert max(sides) - min(sides) < 30, \
+            f"tracklet {t.tracklet_id} jumped between two animals"
+
+
 # --------------------------------------------------------------------------
 # §62 stationary pause
 # --------------------------------------------------------------------------
@@ -205,6 +224,31 @@ def test_short_gap_recovered_with_flags():
     states = {p.state for p in t.points}
     assert "interpolated" in states
     assert all(p.state in ("observed", "interpolated") for p in t.points)
+
+
+def test_gap_beyond_interpolation_window_still_reassociates():
+    """Real detectors flicker for longer than the fill window: a gap past
+    max_interpolated_gap but inside max_gap_frames must re-associate
+    (unfilled) instead of erroring out."""
+    tr = TwoStageTracker(TrackerConfig(max_gap_frames=8, max_interpolated_gap=4))
+    for f in range(17):                            # recovery at f=16, gap=7
+        dets = [] if 10 <= f < 16 else [det(f, 100 + 10 * f, 270)]
+        tr.step(f, dets)
+    assert len(tr.active) == 1 and tr.active[0].last_frame == 16
+    assert not any(p.state == "interpolated" for p in tr.active[0].tracklet.points)
+    assert abs(tr.active[0].velocity[0] - 10.0) < 1e-6
+
+
+def test_interpolated_gap_velocity_stays_px_per_frame():
+    """After filling a gap the velocity must be the true per-frame step,
+    not the residual of the last interpolated point divided by the gap."""
+    tr = TwoStageTracker(TrackerConfig(max_gap_frames=8, max_interpolated_gap=4))
+    for f in range(14):                            # recovery at f=13, gap=4
+        dets = [] if f in (10, 11, 12) else [det(f, 100 + 12 * f, 270)]
+        tr.step(f, dets)
+    assert len(tr.active) == 1
+    assert abs(tr.active[0].velocity[0] - 12.0) < 1e-6, \
+        f"velocity corrupted by gap fill: {tr.active[0].velocity}"
 
 
 def test_long_gap_splits_instead_of_guessing():
