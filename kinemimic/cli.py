@@ -269,6 +269,12 @@ def cmd_eval_retrieval(args):
     run_eval(args.reference, n_query=args.n_query, k=args.k, seed=args.seed)
 
 
+def cmd_vision_doctor(args):
+    """Vision environment probe: GPU, backends, recommendations."""
+    from .vision.doctor import run_doctor
+    run_doctor()
+
+
 def cmd_vision(args):
     """Modern multi-animal vision frontend: detect -> track -> episodes."""
     import json as _json
@@ -444,6 +450,9 @@ def main(argv=None):
     ev.add_argument("--k", type=int, default=6)
     ev.add_argument("--seed", type=int, default=0)
     ev.set_defaults(fn=cmd_eval_retrieval)
+
+    vd = sub.add_parser("vision-doctor", help="GPU/dependency probe + recommendations")
+    vd.set_defaults(fn=cmd_vision_doctor)
 
     v = sub.add_parser("vision", help="modern multi-animal vision frontend")
     v.add_argument("video")

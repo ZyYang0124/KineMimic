@@ -46,6 +46,30 @@ Heavy dependencies are optional and import-guarded: the core package
 never requires them. GPU is auto-detected; without a GPU the modern
 detectors run on CPU (slow) and the legacy backend remains the fast path.
 
+## Running on a CUDA server
+
+```bash
+# one-time setup
+pip install -e .
+pip install ultralytics          # YOLO backend
+pip install rfdetr               # optional benchmark candidate
+
+# verify
+kinemimic vision-doctor          # GPU + backends + recommendations
+
+# research-data run (tiled high-res, strict ambiguity policy)
+kinemimic vision VIDEO.mp4 --id mysite_01 --mode accurate     --detector yolo --tile 1024 --stabilize
+```
+
+`vision-doctor` prints GPU availability, every optional dependency, and
+the recommended backend/mode for this machine. The YOLO backend selects
+`cuda:0` automatically when torch sees a GPU; nothing in the pipeline
+needs code changes between a laptop (CPU, legacy backend) and a GPU
+server (accurate mode). Weights are a separate decision: train or obtain
+a KineMimic detector per docs/VISION_DATASET.md — stock COCO weights
+cannot detect ants, and the quality gate will say so rather than return
+empty tracks.
+
 ## Modes (never silently change scientific meaning)
 
 | mode | detection | tracking | use |
