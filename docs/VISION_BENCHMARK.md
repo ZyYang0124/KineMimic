@@ -56,3 +56,38 @@ memory, and runtime per minute of video at 1080p/4K × 30/120 fps.
 
 Adoption is decided by the cost function above on real footage — not by
 paper rank.
+
+## Real-footage benchmark (Phase B, in progress)
+
+Audit finding (`docs/AUDIT_V0.7.md`): synthetic scenes alone cannot
+clear the vision gate — the only real field clip available exposes two
+failure classes the synthetic set does not cover:
+
+1. **field-card / setup segment** (frames 0–520 of GOPR0395): 135–153
+   noise detections/frame; the old pipeline chained them into fake
+   episodes (the invalid 83-episode baseline). → must become a
+   **hard-negative regression scene**: expected output is *zero*
+   episodes.
+2. **tiny sub-threshold animals** (frames 520–6,891): legacy bgdiff
+   sees nothing (median 0 det/frame); COCO YOLO11n sees nothing
+   relevant (one "toilet" FP). → requires a fine-tuned detector trained
+   on our own annotated clips, plus tiled-inference validation (§18).
+
+### Real-clip GT schema & scenario matrix
+
+Spec moved to `docs/VISION_DATASET.md` stays authoritative for classes;
+scene list and layout live in `data/benchmark/README.md` (skeleton
+created this phase). Key rules: bbox+centroid+identity first;
+`identity_ambiguous` ⇒ expected system behavior is *split*; holdout
+clips are never used for threshold tuning.
+
+### Status
+
+- [x] synthetic 5-scene benchmark + metrics frozen (this file, above)
+- [x] real-footage failure classes identified & quantified
+- [ ] extract 20–50 real clips into `data/benchmark/clips/`
+- [ ] manual GT for dev/validation splits
+- [ ] fine-tune detector on annotated dev split
+- [ ] full-pipeline comparison incl. tiled inference on/off
+- [ ] holdout evaluation → production backend decision
+- [ ] QC burden measured (min review / min video)
