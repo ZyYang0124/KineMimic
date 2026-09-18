@@ -1,0 +1,85 @@
+{
+ "generated_utc": "2026-09-18T01:14:08Z",
+ "mode": "fast",
+ "detector": "legacy",
+ "pipelines": [
+  {
+   "pipeline": "A_legacy_bgdiff+legacy-greedy",
+   "note": "legacy ingest path (background subtraction + greedy)",
+   "per_scene": [
+    {
+     "scene": "crossing",
+     "n_episodes": 3,
+     "mean_purity": 0.839
+    },
+    {
+     "scene": "collision",
+     "n_episodes": 3,
+     "mean_purity": 0.842
+    },
+    {
+     "scene": "stationary",
+     "n_episodes": 1,
+     "mean_purity": 1.0
+    },
+    {
+     "scene": "occlusion",
+     "n_episodes": 2,
+     "mean_purity": 1.0
+    },
+    {
+     "scene": "fast",
+     "n_episodes": 1,
+     "mean_purity": 1.0
+    }
+   ],
+   "n_episodes": 10,
+   "episode_purity_mean": 0.904,
+   "usable_episode_recall": 0.671,
+   "false_merge_rate": 0.2,
+   "fragmentation_extra_per_scene": 0.6,
+   "trajectory_error_px_mean": 0.28,
+   "cost_weighted": 1.629,
+   "runtime_s": 114.1
+  },
+  {
+   "n_episodes": 12,
+   "episode_purity_mean": 1.0,
+   "usable_episode_recall": 0.985,
+   "false_merge_rate": 0.0,
+   "fragmentation_extra_per_scene": 1.0,
+   "trajectory_error_px_mean": 0.27,
+   "cost_weighted": 0.515,
+   "cost_note": "5x false-merge penalty: a merged pair is far worse than a split episode (docs/TRACKING.md)",
+   "per_scene": [
+    {
+     "scene": "crossing",
+     "n_episodes": 4,
+     "mean_purity": 1.0
+    },
+    {
+     "scene": "collision",
+     "n_episodes": 4,
+     "mean_purity": 1.0
+    },
+    {
+     "scene": "stationary",
+     "n_episodes": 1,
+     "mean_purity": 1.0
+    },
+    {
+     "scene": "occlusion",
+     "n_episodes": 2,
+     "mean_purity": 1.0
+    },
+    {
+     "scene": "fast",
+     "n_episodes": 1,
+     "mean_purity": 1.0
+    }
+   ],
+   "pipeline": "B_legacy_bgdiff+twostage",
+   "runtime_s": 78.0
+  }
+ ]
+}

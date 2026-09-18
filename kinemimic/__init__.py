@@ -8,6 +8,6 @@ Core pipeline:
 Every derived datum carries provenance back to source video and frames.
 """
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 
 from .schema import Episode, TrajectoryQC, Provenance  # noqa: F401

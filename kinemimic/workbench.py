@@ -68,6 +68,9 @@ class Workbench:
             "site": ep.site_id or ep.environment.site, "date": ep.environment.date,
             "features": {k: round(float(v), 3) for k, v in
                          list(sorted(ep.trajectory_features.items()))[:17]},
+            "ambiguity_events": len(ep.metadata.get("ambiguity_events", [])),
+            "tracking_confidence": ep.metadata.get("tracking_confidence"),
+            "n_interpolated_points": ep.metadata.get("n_interpolated_points", 0),
             "provenance_chain": ep.provenance_chain(),
         }
 
@@ -192,7 +195,9 @@ function show(i){
  $('idline').textContent=`${st.episode_id} · ${st.video_id} · ${st.duration_s}s · frames ${st.frames[0]}–${st.frames[1]}`;
  $('machine').innerHTML=`机器预分类(非真值): <b>${st.machine_label}</b> (${st.machine_confidence.toFixed(2)})`+
    `<span class="warn">⚠ 运动特征参与了这个预测——拟态分析必须使用你的人工标注</span>`+
-   (st.human_label?`<span style="color:#4fd1c5">已标注: ${st.human_label} (${st.annotation_status})</span>`:'');
+   (st.human_label?`<span style="color:#4fd1c5">已标注: ${st.human_label} (${st.annotation_status})</span>`:'')+
+   (st.ambiguity_events?`<span class="warn">⚠ Association ambiguity: ${st.ambiguity_events} event(s) — check for identity contamination</span>`:'')+
+   (st.n_interpolated_points?`<span class="warn">· ${st.n_interpolated_points} interpolated points</span>`:'');
  $('feat').innerHTML=Object.entries(st.features).map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join('');
  $('prov').textContent=st.provenance_chain.join('\n');
  $('clip').src=`clip/${st.episode_id}.gif?zoom=1&r=${Date.now()}`;

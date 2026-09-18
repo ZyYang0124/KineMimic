@@ -72,13 +72,21 @@ phenotypes → comparable behavioral space → controls → explorable atlas.
 ## 6. Pipeline
 
 ```
-Video → Detection → Tracking → Movement Episodes
+Video → Vision Frontend (pluggable detectors + ambiguity-aware tracking)
+      → high-purity Tracklets → Movement Episodes
       → Kinematic Features → Behavioral Space (label-blind PCA)
       → Motifs → Behavioral Mimicry Fingerprint (per-dimension)
       → Interactive Atlas
       + Human Annotation / QC + Interaction Context (scenes, pairwise)
       + Behavioral Retrieval (Find Similar)
 ```
+
+The vision frontend is modular (docs/VISION.md): the original
+background-subtraction backend remains the CPU fallback; a modern
+multi-animal tracker (purity-first, ambiguity-aware splitting —
+docs/TRACKING.md) and trained detectors plug in behind the same
+interface, selected by the KineMimic tracking benchmark
+(docs/VISION_BENCHMARK.md), not by leaderboard rank.
 
 Human annotation is the only admissible ground truth: machine
 pre-classification shares features with the movement analysis and is

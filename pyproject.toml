@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kinemimic"
-version = "0.6.0"
+version = "0.7.0"
 description = "Exploring how ant mimics evolve to move like ants — an explorable behavioral phenotype space for the evolution of ant mimicry"
 readme = "README.md"
 requires-python = ">=3.10"

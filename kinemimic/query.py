@@ -77,7 +77,9 @@ def run_query(video_path: str, query_id: str, reference_dir: str | Path,
               metric: str = "euclidean", target_fps: float = 30.0,
               min_duration_s: float = 3.0, use_representation_b: bool = True,
               detector_params: dict | None = None,
-              tracker_max_gap: int = 3) -> dict:
+              tracker_max_gap: int = 3,
+              vision_mode: str = "legacy",
+              vision_detector: str = "legacy") -> dict:
     """Full Find Similar pipeline for one uploaded video."""
     t0 = time.time()
     ref_dir = Path(reference_dir)
@@ -93,10 +95,22 @@ def run_query(video_path: str, query_id: str, reference_dir: str | Path,
 
     # 1-3. ingest: detection -> tracking -> episodes (existing pipeline)
     store = EpisodeStore(store_dir) if store_dir else None
-    episodes = ingest_video(video_path, store, query_id,
-                            min_duration_s=min_duration_s, target_fps=target_fps,
-                            detector_params=detector_params,
-                            tracker_max_gap=tracker_max_gap)
+    if vision_mode != "legacy":
+        from .vision.pipeline import VisionConfig, run_vision_frontend
+        from .vision.tracker import TrackerConfig
+        cfg = VisionConfig(mode=vision_mode, detector=vision_detector,
+                           detector_params=detector_params or {},
+                           tracker_cfg=TrackerConfig(
+                               max_gap_frames=max(tracker_max_gap, 3),
+                               source_video_id=query_id),
+                           min_duration_s=min_duration_s)
+        frontend = run_vision_frontend(video_path, query_id, cfg)
+        episodes = frontend["episodes"]
+    else:
+        episodes = ingest_video(video_path, store, query_id,
+                                min_duration_s=min_duration_s, target_fps=target_fps,
+                                detector_params=detector_params,
+                                tracker_max_gap=tracker_max_gap)
     if not episodes:
         return {"query_id": query_id, "error": "no movement episodes detected",
                 "provenance": {"reference_atlas_version": index.version_id}}

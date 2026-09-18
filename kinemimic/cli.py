@@ -217,7 +217,9 @@ def cmd_find_similar(args):
                        target_fps=args.target_fps,
                        min_duration_s=args.min_duration_s,
                        detector_params=detector_params or None,
-                       tracker_max_gap=args.max_gap)
+                       tracker_max_gap=args.max_gap,
+                       vision_mode=args.vision_mode,
+                       vision_detector=args.detector)
     if bundle.get("error"):
         print(f"query failed: {bundle['error']}")
         return
@@ -265,6 +267,60 @@ def cmd_eval_retrieval(args):
     """Retrieval benchmark: leave-video-out, confound + positive controls."""
     from .eval_retrieval import run_eval
     run_eval(args.reference, n_query=args.n_query, k=args.k, seed=args.seed)
+
+
+def cmd_vision(args):
+    """Modern multi-animal vision frontend: detect -> track -> episodes."""
+    import json as _json
+    from .vision.pipeline import VisionConfig, run_vision_frontend, VisionQCFailed
+    detector_params = {}
+    if args.threshold is not None:
+        detector_params["threshold"] = args.threshold
+    if args.min_area is not None:
+        detector_params["min_area"] = args.min_area
+    if args.no_morph_open:
+        detector_params["morph_open_k"] = 0
+    cfg = VisionConfig(
+        mode=args.mode, detector=args.detector, detector_params=detector_params,
+        tracker_cfg=__import__("kinemimic.vision.tracker", fromlist=["TrackerConfig"]).TrackerConfig(
+            max_gap_frames=args.max_gap),
+        tile_w=args.tile, tile_h=args.tile, tile_overlap=args.overlap,
+        inference_stride=args.stride, camera_stabilization=args.stabilize,
+        min_duration_s=args.min_episode_s,
+        roi=tuple(int(x) for x in args.roi.split(",")) if args.roi else None)
+    try:
+        run = run_vision_frontend(args.video, args.id, cfg)
+    except VisionQCFailed as e:
+        print(f"VISION QC FAILED: {e}")
+        raise SystemExit(2)
+    from .store import EpisodeStore
+    store = EpisodeStore(args.store)
+    from .pipeline import analyze
+    run_dir = analyze(store, run["episodes"], n_motifs=args.n_motifs)
+    s = _json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))
+    atlas = build_atlas(run["episodes"], run_dir / "atlas",
+                        summary=s,
+                        run_provenance=_json.loads(
+                            (run_dir / "manifest.json").read_text(encoding="utf-8")))
+    print(f"vision frontend: {args.video}")
+    st = run["stats"]
+    print(f"  mode {args.mode} · detector {args.detector} · {st['n_frames_analyzed']} frames "
+          f"({st['runtime_s']}s) · fps {st['fps']}")
+    print(f"  tracklets: {st['n_tracklets']} -> episodes: {st['n_episodes']}")
+    n_amb = sum(len(e.metadata.get("ambiguity_events", [])) for e in run["episodes"])
+    print(f"  ambiguity events: {n_amb} (episodes carry them for QC)")
+    print(f"  run: {run_dir}")
+    print(f"  atlas: {atlas}")
+    print(f"  next: python -m kinemimic annotate {run_dir / 'episodes.jsonl'}")
+
+
+def cmd_vision_benchmark(args):
+    from .vision.benchmark import run_benchmark
+    r = run_benchmark(out_path=args.out, mode=args.mode, detector=args.detector)
+    for p in r["pipelines"]:
+        print(f"{p['pipeline']}: purity {p.get('episode_purity_mean')} · "
+              f"recall {p.get('usable_episode_recall')} · false merge {p.get('false_merge_rate')} · "
+              f"COST {p.get('cost_weighted')}")
 
 
 def cmd_benchmark(args):
@@ -375,6 +431,9 @@ def main(argv=None):
                     help="detector: skip 3x3 opening (keeps few-pixel targets)")
     fs.add_argument("--max-gap", type=int, default=3,
                     help="tracker: missed frames a track may bridge")
+    fs.add_argument("--vision-mode", default="legacy",
+                    choices=["legacy", "fast", "accurate", "assisted"],
+                    help="video frontend for the query (multi-animal capable)")
     fs.set_defaults(fn=cmd_find_similar)
 
     ev = sub.add_parser("eval-retrieval", help="retrieval benchmark (leave-video-out etc.)")
@@ -383,6 +442,33 @@ def main(argv=None):
     ev.add_argument("--k", type=int, default=6)
     ev.add_argument("--seed", type=int, default=0)
     ev.set_defaults(fn=cmd_eval_retrieval)
+
+    v = sub.add_parser("vision", help="modern multi-animal vision frontend")
+    v.add_argument("video")
+    v.add_argument("--id", required=True)
+    v.add_argument("--store", default="kinemimic_runs")
+    v.add_argument("--mode", default="fast", choices=["fast", "accurate", "assisted"])
+    v.add_argument("--detector", default="legacy", choices=["legacy", "yolo", "rfdetr"])
+    v.add_argument("--tile", type=int, default=1024, help="tile size (accurate mode)")
+    v.add_argument("--overlap", type=float, default=0.2)
+    v.add_argument("--stride", type=int, default=1, help="analyze every Nth frame")
+    v.add_argument("--max-gap", type=int, default=8, help="tracker coast window (frames)")
+    v.add_argument("--stabilize", action="store_true",
+                   help="global camera-motion compensation")
+    v.add_argument("--threshold", type=int, default=None)
+    v.add_argument("--min-area", type=int, default=None)
+    v.add_argument("--no-morph-open", action="store_true")
+    v.add_argument("--roi", default=None,
+                   help="region of interest x,y,w,h (recorded in provenance)")
+    v.add_argument("--min-episode-s", type=float, default=3.0)
+    v.add_argument("--n-motifs", type=int, default=8)
+    v.set_defaults(fn=cmd_vision)
+
+    vb = sub.add_parser("vision-benchmark", help="KineMimic tracking benchmark")
+    vb.add_argument("--mode", default="fast", choices=["fast", "accurate", "assisted"])
+    vb.add_argument("--detector", default="legacy", choices=["legacy", "yolo", "rfdetr"])
+    vb.add_argument("--out", default="benchmarks/tracking_benchmark.json")
+    vb.set_defaults(fn=cmd_vision_benchmark)
 
     b = sub.add_parser("benchmark", help="atlas scale benchmark")
     b.add_argument("--n", type=int, nargs="+", default=[1000, 5000, 10000, 20000])
