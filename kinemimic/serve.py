@@ -206,7 +206,9 @@ def make_handler(server: AtlasServer):
                 if m is not None:
                     return self._json(m)
                 return self._json({"error": "not found"}, 404)
-            if p.startswith("/clip/"):
+            if p.startswith("/clip/") or p.startswith("/clips/"):
+                # /clips/<id>.gif (static layout used by atlas HTML) is routed
+                # to the same on-demand generator as /clip/<id>.gif
                 eid = Path(unquote(p)).stem
                 try:
                     gif = server.clip_path(eid)
