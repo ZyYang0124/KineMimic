@@ -307,6 +307,8 @@ def cmd_vision(args):
     print(f"  mode {args.mode} · detector {args.detector} · {st['n_frames_analyzed']} frames "
           f"({st['runtime_s']}s) · fps {st['fps']}")
     print(f"  tracklets: {st['n_tracklets']} -> episodes: {st['n_episodes']}")
+    print(f"  fragmentation: median tracklet {st['median_tracklet_seconds']}s "
+          f"(need >= {args.min_episode_s}s) · {st['detections_per_frame']} dets/frame")
     n_amb = sum(len(e.metadata.get("ambiguity_events", [])) for e in run["episodes"])
     print(f"  ambiguity events: {n_amb} (episodes carry them for QC)")
     print(f"  run: {run_dir}")

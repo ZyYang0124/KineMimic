@@ -96,7 +96,7 @@ def run_query(video_path: str, query_id: str, reference_dir: str | Path,
     # 1-3. ingest: detection -> tracking -> episodes (existing pipeline)
     store = EpisodeStore(store_dir) if store_dir else None
     if vision_mode != "legacy":
-        from .vision.pipeline import VisionConfig, run_vision_frontend
+        from .vision.pipeline import VisionConfig, run_vision_frontend, VisionQCFailed
         from .vision.tracker import TrackerConfig
         cfg = VisionConfig(mode=vision_mode, detector=vision_detector,
                            detector_params=detector_params or {},
@@ -104,7 +104,12 @@ def run_query(video_path: str, query_id: str, reference_dir: str | Path,
                                max_gap_frames=max(tracker_max_gap, 3),
                                source_video_id=query_id),
                            min_duration_s=min_duration_s)
-        frontend = run_vision_frontend(video_path, query_id, cfg)
+        try:
+            frontend = run_vision_frontend(video_path, query_id, cfg)
+        except VisionQCFailed as e:
+            return {"query_id": query_id, "error": "vision quality gate rejected "
+                    "this video", "reason": str(e),
+                    "provenance": {"reference_atlas_version": index.version_id}}
         episodes = frontend["episodes"]
     else:
         episodes = ingest_video(video_path, store, query_id,

@@ -174,6 +174,26 @@ def run_vision_frontend(video_path: str, video_id: str,
     episodes = tracklets_to_episodes(tracklets, video_id, video_path, fps,
                                      min_duration_s=cfg.min_duration_s,
                                      max_duration_s=cfg.max_duration_s)
+    analyzed_s = n_processed / fps
+    tracklet_durations_s = sorted(
+        (t.end_frame - t.start_frame) / fps for t in tracklets)
+    median_tracklet_s = (tracklet_durations_s[len(tracklet_durations_s) // 2]
+                         if tracklet_durations_s else 0.0)
+    # Fragmentation check: no invented constant — the yardstick is the
+    # run's own min_duration_s. If enough footage was analyzed to contain
+    # an episode and none survived, nothing in this video was ever
+    # reliably attributable to a single animal.
+    if n_processed >= 10 and analyzed_s >= cfg.min_duration_s and not episodes:
+        raise VisionQCFailed(
+            f"Vision QC failed: {len(tracklets)} tracklets from "
+            f"{analyzed_s:.1f}s of footage, median lifetime "
+            f"{median_tracklet_s:.2f}s, {n_det_sum / max(n_processed, 1):.0f} "
+            f"detections per frame -> no window long enough to belong to one "
+            f"animal. The detector is tracking background noise, not animals. "
+            f"Suggestions: raise --min-area / --threshold to drop debris and "
+            f"leaf flecks, set --roi to exclude moving vegetation, or switch "
+            f"to a trained detector (docs/VISION_DATASET.md §48 hard "
+            f"negatives).")
     prov = Provenance(
         software_version=__version__, model_name=f"vision-frontend-{cfg.mode}",
         model_version="1",
@@ -195,6 +215,9 @@ def run_vision_frontend(video_path: str, video_id: str,
                   "mean_detection_confidence": round(mean_conf, 3),
                   "n_tracklets": len(tracklets),
                   "n_episodes": len(episodes),
+                  "analyzed_seconds": round(analyzed_s, 1),
+                  "median_tracklet_seconds": round(median_tracklet_s, 3),
+                  "detections_per_frame": round(n_det_sum / max(n_processed, 1), 1),
                   "total_track_seconds": round(total_track_s, 1),
                   "runtime_s": round(time.time() - t0, 1), "fps": fps},
     }

@@ -341,6 +341,37 @@ def test_vision_frontend_end_to_end():
         assert "tracking_confidence" in ep.metadata
 
 
+def test_quality_gate_rejects_noise_dominated_footage():
+    """§48 signature: every frame lights up with uncorrelated specks (so
+    the gate's detection-absence floors pass) yet nothing is ever reliably
+    one animal. That run must be refused, not reported as a clean
+    zero-episode result."""
+    import cv2
+    import pytest
+    import tempfile
+    from kinemimic.vision.pipeline import VisionQCFailed
+    rng = np.random.default_rng(0)
+    vdir = Path(tempfile.gettempdir()) / "km_vision_noise"
+    vdir.mkdir(parents=True, exist_ok=True)
+    vpath = vdir / "specks.avi"
+    W = H = 320
+    vw = cv2.VideoWriter(str(vpath), cv2.VideoWriter_fourcc(*"MJPG"),
+                         30.0, (W, H), isColor=False)
+    for _ in range(150):
+        frame = np.zeros((H, W), np.uint8)
+        for cx, cy in rng.integers(12, W - 12, size=(30, 2)):
+            cv2.circle(frame, (int(cx), int(cy)), 5, 200, -1)
+        vw.write(frame)
+    vw.release()
+    with pytest.raises(VisionQCFailed) as ei:
+        run_vision_frontend(str(vpath), "specks",
+                            VisionConfig(mode="fast", detector="legacy",
+                                         min_duration_s=3.0))
+    msg = str(ei.value)
+    assert "median lifetime" in msg and "detections per frame" in msg, msg
+    assert "confidence" not in msg, "must be the fragmentation arm, not the floor"
+
+
 if __name__ == "__main__":
     for name, fn in sorted(list(globals().items())):
         if name.startswith("test_"):

@@ -59,6 +59,29 @@ geometry, thresholds, stride, ROI, camera-stabilization shifts and
 software version in its provenance (append-only, as everywhere in
 KineMimic).
 
+## Quality gate (§56)
+
+A run that cannot support the science is refused, not dressed up. Three
+arms, all evaluated on the run's own numbers:
+
+1. **no detections** — fewer than 2% of analyzed frames contain any
+   detection (the detector cannot see this footage at all).
+2. **low confidence** — mean detection confidence below 0.2.
+3. **fragmentation** — enough footage was analyzed to contain an episode
+   (>= `min_duration_s`) but no tracklet survived to episode length. The
+   yardstick is the run's own `min_duration_s`, not an invented
+   constant: if the median tracklet lifetime is far below it, the
+   detector is following background noise — debris, leaf flecks, glare,
+   a field card's handwriting (docs/VISION_DATASET.md §48) — and every
+   downstream number would be fabricated.
+
+The third arm exists because the first two only bound detection
+*absence*: a 1920x1080 clip yielding thousands of one-frame tracklets
+per second passed arms 1 and 2 while producing zero episodes, and was
+reported as a clean run. `median_tracklet_seconds` and
+`detections_per_frame` are recorded in the run stats even when a run
+passes, so a suspiciously noisy video is visible before it is trusted.
+
 ## Input expectations
 
 - Fixed-ish camera or mild shake (compensable by global translation).
