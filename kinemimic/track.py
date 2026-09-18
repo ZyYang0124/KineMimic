@@ -41,13 +41,24 @@ class GreedyTracker:
     animal chain into one track; reliability is still enforced downstream
     by episode minimum duration and QC coverage."""
 
-    def __init__(self, max_jump_px: float = 60.0, max_gap: int = 0):
+    def __init__(self, max_jump_px: float = 60.0, max_gap: int = 0,
+                 chaos_max_dets: int = 40):
         self.max_jump_px = max_jump_px
         self.max_gap = max_gap
+        # Purity-first chaos guard: a frame with more detections than this
+        # is treated as chaotic (texture/field-card/shake artifacts). No
+        # track may be extended through a chaotic frame — chaining noise
+        # is how the invalid 83-episode field baseline was born. The worst
+        # error is a false merge, never a missing fragment.
+        self.chaos_max_dets = chaos_max_dets
+        self.chaotic_frames: list[int] = []
         self.tracks: list[Track] = []
         self._next_id = 0
 
     def step(self, frame_idx: int, dets: list[dict]) -> None:
+        if len(dets) > self.chaos_max_dets:
+            self.chaotic_frames.append(frame_idx)
+            return
         gap = self.max_gap + 1
         live = [t for t in self.tracks
                 if 0 < frame_idx - t.last_frame <= gap]

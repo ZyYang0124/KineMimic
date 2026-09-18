@@ -9,3 +9,6 @@ __pycache__/
 data/external/
 kinemimic.egg-info/
 *.egg-info/
+data/benchmark/clips/
+data/benchmark/*.mp4
+yolo11n.pt

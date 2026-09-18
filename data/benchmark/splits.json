@@ -1,0 +1,6 @@
+{
+  "development": ["fieldcard_hardneg", "tiny_ants_body", "density_crossing"],
+  "validation": [],
+  "holdout": ["tiny_ants_late"],
+  "note": "holdout clips are never used while tuning thresholds (roadmap §12). validation split to be filled as GT annotation proceeds."
+}

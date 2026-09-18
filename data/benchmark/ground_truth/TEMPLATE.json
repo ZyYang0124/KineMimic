@@ -1,0 +1,18 @@
+{
+  "scene_id": "TEMPLATE",
+  "source_video": "GOPR0395_ns.MP4",
+  "source_frame_range": [0, 0],
+  "fps": 119.88,
+  "px_per_mm": null,
+  "animals": [
+    {"id": "A1", "class": "ant",
+     "frames": [[0, 640.5, 360.2, 14, 9]],
+     "notes": "frame, cx, cy, w, h (pixels)"}
+  ],
+  "ambiguous_intervals": [
+    {"frames": [300, 340], "ids": ["A1", "A2"],
+     "reason": "body contact; identity not human-resolvable",
+     "expected_system_behavior": "split"}
+  ],
+  "artifacts": []
+}
