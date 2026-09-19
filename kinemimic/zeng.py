@@ -1,5 +1,9 @@
 """Import Zeng et al. 2023 (iScience, Siler collingwoodi) gait raw data.
 
+Paper: "Imperfect ant mimicry contributes to local adaptation in a
+jumping spider", iScience 26, 106947 (doi:10.1016/j.isci.2023.106947);
+underlying data on Mendeley (10.17632/jrvzn7n475.1).
+
 The published workbook contains per-frame kinematics for ~120 individuals:
 
     velocity (mm/s), forelimb-1/2 height (spiders) or antennae-1/2 height
@@ -132,6 +136,7 @@ def load_zeng_episodes(xlsx_path: str | Path, min_frames: int = 150) -> list[Epi
                 software_version=__version__, model_name="zeng2023-import",
                 model_version="1",
                 parameters=dict(dataset="Mendeley 10.17632/jrvzn7n475.1",
+                                doi="10.1016/j.isci.2023.106947",
                                 sheet=sheet, individual=ind, n_frames=len(arr),
                                 assumed_fps=ASSUMED_FPS,
                                 note="velocity episode: no xy published; "

@@ -144,3 +144,26 @@ encode?", it belongs in this list or it gets deleted.
   interpretation is only admissible on real runs (check Data & provenance).
 - Nothing in the interface was tuned to make Siler look ant-like: the
   embedding, motifs, and neighbors are computed before any label is read.
+
+## 11. What is measured vs what is modeled
+
+Framing borrowed from the desktop-fly project's explicit "what's modeled
+vs measured" section: a reader should be able to tell at a glance which
+parts of a result are observations and which are our choices. Both are
+legitimate science; conflating them is not.
+
+| pipeline stage | status |
+|---|---|
+| source video frames | **measured** — real footage or published datasets (per-dataset DOI recorded in provenance, e.g. Zeng 2023 `10.1016/j.isci.2023.106947`, Shamble 2017 `10.5061/dryad.fd612`) |
+| per-frame positions | **measured, up to tracker error** — error is quantified by the vision benchmark; interpolated/propagated points are explicitly flagged (`point_states`), never silently mixed |
+| frame rate, spatial scale | measured when calibrated (px/cm); otherwise dimensionless, and the run says so |
+| episode boundaries | **modeling choice** — the purity-first policy (prefer splitting over guessing, gaps not bridged) defines what exists; see §1 and TRACKING.md |
+| the 16 kinematic features | **modeling choice** — a hypothesis about which movement dimensions matter; the feature list is versioned in provenance |
+| z-standardization, PCA, motifs | **derived** — deterministic transforms of the choices above, blind to labels (§4); the chosen k is recorded in run provenance |
+| machine_label | model output, never truth (§3) |
+| human_label | **measured** — independent annotation; the only admissible ground truth |
+| neighbor / similarity queries | exact computation over the chosen feature space (§7) — meaningful only within that space |
+| any mimicry claim | **never produced by this software** (§10) — the atlas organizes evidence; inference happens in analysis with the sampling hierarchy respected (§6) |
+
+The rule this table enforces: a user must never have to guess whether a
+number they are looking at was observed, derived, or decided.
