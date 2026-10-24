@@ -372,6 +372,73 @@ def test_quality_gate_rejects_noise_dominated_footage():
     assert "confidence" not in msg, "must be the fragmentation arm, not the floor"
 
 
+# --- motion-as-colour rendering (after BehaveAI) ---------------------
+
+def _moving_blob_frames(n=12, w=120, h=100, step=8, blob=8, x0=8, row=50):
+    """Non-overlapping blob jumps: every visited pixel gets one clean
+    motion pulse (arrival + departure in a single diff), so EMA decay
+    and channel ordering are exactly predictable."""
+    frames = []
+    for t in range(n):
+        f = np.full((h, w), 128, dtype=np.uint8)
+        x = x0 + t * step
+        f[row:row + blob, x:x + blob] = 255
+        frames.append(f)
+    return frames, row, x0, step, blob
+
+
+def test_motion_colour_exponential_trail_decays_to_red():
+    from kinemimic.vision.motion_colour import MotionColourEncoder
+    frames, row, x0, step, blob = _moving_blob_frames()
+    enc = MotionColourEncoder("exponential")
+    outs = [enc.push(f) for f in frames]
+    assert all(o.shape == (100, 120, 3) for o in outs)
+    # background the blob never touched: exactly dark (no fabricated signal)
+    bg = outs[-1][80:, 100:]
+    assert bg.max() < 10
+    # 6 frames after the blob left a pixel: trail has aged to red
+    # (fast B decayed first, slow R still glowing) -- white -> red decay
+    px = outs[-1][row + blob // 2, x0 + 5 * step + blob // 2].astype(int)
+    assert px[0] > 30 and px[0] > px[1] > px[2], px
+    # conversely, the newest motion (this frame's fresh leading edge) lights
+    # the FAST channel first: B hot while slow R has barely responded
+    now = outs[-1][row + blob // 2, x0 + 11 * step].astype(int)
+    assert now[2] > 100 and now[2] > now[0], now
+
+
+def test_motion_colour_static_video_is_dark():
+    from kinemimic.vision.motion_colour import motion_colour_video
+    frames = [np.full((60, 80), 128, dtype=np.uint8)] * 6
+    outs = motion_colour_video(frames)
+    assert max(o.max() for o in outs) < 10  # documented blindness: no motion, no signal
+
+
+def test_motion_colour_sequential_keeps_shape_and_history():
+    from kinemimic.vision.motion_colour import MotionColourEncoder
+    frames, row, x0, step, blob = _moving_blob_frames()
+    enc = MotionColourEncoder("sequential")
+    outs = [enc.push(f) for f in frames]
+    # before history exists channels are dark, not fabricated
+    assert outs[0].max() < 10
+    # once history exists, the current blob lights the nearest-diff (R)
+    # channel (this pixel is inside the last blob but was background at t-1)
+    px = outs[-1][row + blob // 2, x0 + 11 * step + blob // 2].astype(int)
+    assert px[0] > 60, px
+    prov = enc.provenance()
+    assert prov["strategy"] == "sequential" and "pbio.3003632" in prov["transform"]
+
+
+def test_motion_colour_rejects_bad_config():
+    import pytest
+    from kinemimic.vision.motion_colour import MotionColourEncoder
+    with pytest.raises(ValueError):
+        MotionColourEncoder("colourwheel")
+    with pytest.raises(ValueError):
+        MotionColourEncoder("exponential", skip=0)
+    with pytest.raises(ValueError):
+        MotionColourEncoder("exponential", decay=(0.5, 0.5))
+
+
 if __name__ == "__main__":
     for name, fn in sorted(list(globals().items())):
         if name.startswith("test_"):

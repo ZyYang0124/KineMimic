@@ -46,6 +46,49 @@ Heavy dependencies are optional and import-guarded: the core package
 never requires them. GPU is auto-detected; without a GPU the modern
 detectors run on CPU (slow) and the legacy backend remains the fast path.
 
+## Motion-as-colour (after BehaveAI)
+
+`kinemimic.vision.motion_colour` re-renders video so that motion itself
+becomes the visible channel — the representation popularised by
+**BehaveAI** (Troscianko et al. 2026, PLOS Biology,
+doi:10.1371/journal.pbio.3003632; open source, Zenodo
+10.5281/zenodo.18232555). Two strategies: `exponential` (per-channel
+EMAs of frame differences with distinct decay rates — recent motion is
+whitish, then ages white → red) and `sequential` (differences against
+t−1/t−2/t−3 coded into R/G/B, preserving the moving part's shape).
+
+Why we care: the Phase A field-footage audit found our two hardest
+detection classes are *tiny* animals (median 0 detections; ~9 px ants
+below the legacy threshold) and *appearance-free* targets (COCO YOLO is
+useless). BehaveAI reports YOLO trained on motion-colour frames
+detecting ~2-pixel moths at P/R ≈ 0.81/0.80 where appearance-only
+training collapsed (0.79/0.54), with camouflaged isopods at 0.92 recall
+— the same failure classes, solved by changing the *representation*
+rather than the model.
+
+Current use — filming and footage QC, no detector required:
+
+    python -m kinemimic motion-colour VIDEO.MP4 --strategy exponential
+
+Writes a false-colour AVI. Sparse bright trails on a dark frame mean
+moving animals made salient; a near-black frame means nothing is moving
+**in this representation** — stationary animals are invisible (darkness
+is not evidence of absence; the CLI prints this caveat, and it is why
+BehaveAI itself is dual-stream). Provenance of the transform is printed
+with the output.
+
+Planned use — dual-stream training on the CUDA server: render
+motion-colour frames for annotated clips (docs/VISION_DATASET.md), train
+the YOLO backend on static+motion frames, then let the **KineMimic
+tracking benchmark decide** whether the motion stream earns a place in
+FAST/ACCURATE. BehaveAI's published numbers are on their taxa and
+footage, not ours; admission is by our benchmark only.
+
+What we deliberately do not adopt: their Kalman tracker (ours is
+purity-first two-stage association, already benchmarked) and their
+hierarchical classifier chain (our labels stay human-grounded with
+machine labels quarantined as `machine_label`).
+
 ## Running on a CUDA server
 
 ```bash

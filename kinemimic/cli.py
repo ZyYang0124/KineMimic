@@ -275,6 +275,37 @@ def cmd_vision_doctor(args):
     run_doctor()
 
 
+def cmd_motion_colour(args):
+    """Render motion-as-colour QC video (after BehaveAI) from any footage."""
+    import cv2
+    from .vision.motion_colour import MotionColourEncoder
+    cap = cv2.VideoCapture(args.video)
+    if not cap.isOpened():
+        raise SystemExit(f"cannot open video: {args.video}")
+    out_path = Path(args.out or (Path(args.video).stem + "_motion.avi"))
+    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    writer = cv2.VideoWriter(str(out_path), cv2.VideoWriter_fourcc(*"MJPG"),
+                             fps / max(args.stride, 1), (w, h), isColor=True)
+    enc = MotionColourEncoder(args.strategy, skip=args.skip, gain=args.gain)
+    n = 0
+    while True:
+        ok, frame = cap.read()
+        if not ok or (args.max_frames and n >= args.max_frames * args.stride):
+            break
+        n += 1
+        if (n - 1) % args.stride:
+            continue
+        writer.write(enc.push(frame))
+    cap.release()
+    writer.release()
+    print(f"motion-colour QC video: {out_path}  ({n} frames read)")
+    print(f"  provenance: {enc.provenance()}")
+    print("  note: stationary animals are invisible in this view (motion "
+          "stream only); darkness is not evidence of absence.")
+
+
 def cmd_vision(args):
     """Modern multi-animal vision frontend: detect -> track -> episodes."""
     import json as _json
@@ -453,6 +484,18 @@ def main(argv=None):
 
     vd = sub.add_parser("vision-doctor", help="GPU/dependency probe + recommendations")
     vd.set_defaults(fn=cmd_vision_doctor)
+    mc = sub.add_parser("motion-colour",
+                        help="render motion-as-colour QC video (after BehaveAI)")
+    mc.add_argument("video")
+    mc.add_argument("--strategy", choices=["exponential", "sequential"],
+                    default="exponential")
+    mc.add_argument("--skip", type=int, default=1,
+                    help="frame skip for sequential diffs / slow footage")
+    mc.add_argument("--gain", type=float, default=3.0)
+    mc.add_argument("--stride", type=int, default=1, help="process every Nth frame")
+    mc.add_argument("--max-frames", type=int, default=None)
+    mc.add_argument("--out", default=None)
+    mc.set_defaults(fn=cmd_motion_colour)
 
     v = sub.add_parser("vision", help="modern multi-animal vision frontend")
     v.add_argument("video")
