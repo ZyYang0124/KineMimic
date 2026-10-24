@@ -167,3 +167,36 @@ legitimate science; conflating them is not.
 
 The rule this table enforces: a user must never have to guess whether a
 number they are looking at was observed, derived, or decided.
+
+## 12. What space is "ant-like" defined in?
+
+Our similarity spaces (16-D kinematics, shape series) are
+**human-engineered feature spaces**. Occupancy-based ant-like regions
+(§0) and D_ant are defined in those spaces. Whether those dimensions
+correspond to what a receiving animal can discriminate is an open
+empirical question: a salticid or mantid predator samples the world at
+its own spatial acuity and temporal resolution, so some fine kinematic
+distinctions we measure may be receiver-invisible, and some
+receiver-salient dimensions (e.g. motion rhythm at particular temporal
+frequencies) may be under-measured by our features.
+
+The receiver-space view has a methodological precedent: Hancock et al.
+2026 (Nature 658:958–962, doi:10.1038/s41586-026-11062-w) showed
+butterfly wing patterns combined with flapping create illusory motion
+cues *in an explicit receiver model* — an elementary-motion-detector
+simulation run through avian double-cone quantum catch — validated by
+human "predator" attack errors and by an evolutionary simulation that
+converged on natural-like patterns. The general principle: the
+biologically relevant motion signal is the one the receiver's visual
+system computes, not the one our features compute. Receiver-dependence
+is already documented in our own data system: Zeng et al. 2023's
+behavioral assays found Siler mimicry deceives spider predators but not
+mantids — "ant-like" is receiver-specific.
+
+Status: **no KineMimic interface claim uses a receiver-vision model.**
+D_ant and ant-like regions are human-space quantities and are to be
+read as such. A receiver-perception transform (if ever added) would be
+a versioned representation with its parameters (acuity, temporal
+resolution, receptor classes) reported as assumptions, calibrated
+against real predator assays — not silently substituted for the current
+feature space.

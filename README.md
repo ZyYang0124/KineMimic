@@ -152,7 +152,12 @@ docs/MODEL_CARD.md). Not a species identifier.
 Technology (encoders, ANN backends, rendering) serves these phases; it is
 never the roadmap itself. Long-term hypotheses — e.g. a
 morphology↓/behavior↑ compensation between static and dynamic mimicry —
-remain hypotheses under test, never UI claims.
+remain hypotheses under test, never UI claims. Later phases may add a
+receiver-perception view (which kinematic distinctions a salticid/mantid
+receiver can even discriminate; cf. Hancock et al. 2026, Nature
+658:958–962, whose butterfly motion-dazzle analysis ran stimuli through
+an explicit predator-vision motion model) — a representation upgrade,
+not a new roadmap.
 
 ## 12. Reproducibility
 
